@@ -5,16 +5,18 @@ import { setup } from '../src/frontend';
 import { deferred, fake, until } from './fake';
 const cleanups: (() => void)[] = [];
 afterEach(() => { while (cleanups.length) cleanups.pop()!(); });
-async function harness() {
-  const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'https://lumiverse.test' });
+async function harness(plainHTTP = false) {
+  const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: plainHTTP ? 'http://192.0.2.1:7860' : 'https://lumiverse.test' });
+  // jsdom does not enforce secure-context restrictions; match a browser on LAN HTTP.
+  if (plainHTTP) Object.defineProperty(dom.window.crypto, 'randomUUID', { value: undefined });
   const previous = new Map<string, PropertyDescriptor | undefined>();
-  for (const [key, value] of Object.entries({ window: dom.window, document: dom.window.document, Node: dom.window.Node, Element: dom.window.Element })) { previous.set(key, Object.getOwnPropertyDescriptor(globalThis, key)); Object.defineProperty(globalThis, key, { configurable: true, value }); }
+  for (const [key, value] of Object.entries({ window: dom.window, document: dom.window.document, Node: dom.window.Node, Element: dom.window.Element, crypto: dom.window.crypto })) { previous.set(key, Object.getOwnPropertyDescriptor(globalThis, key)); Object.defineProperty(globalThis, key, { configurable: true, value }); }
   cleanups.push(() => { dom.window.close(); for (const [key, descriptor] of previous) { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else Reflect.deleteProperty(globalThis, key); } });
   const f = fake(); await f.ready(); let onBackend: (payload: unknown) => void = () => {};
   let stateCallback: (value: unknown) => void = () => {}; let eventCallback: (value: unknown) => void = () => {};
-  let messageAction: (id: string) => void = () => {}; let ready = false; let subscriptions = 0;
+  let messageAction: (id: string) => void = () => {}; let inputAction: () => void = () => {}; let ready = false; let subscriptions = 0;
   const widgets: { root: HTMLElement; visible: boolean; destroyed: boolean; width: number; height: number }[] = [];
-  const requests: { action: string; data: Record<string, unknown> }[] = [];
+  const requests: { action: string; data: Record<string, unknown>; id: string; client: string; binding: string }[] = [];
   const sub = () => { subscriptions++; return () => subscriptions--; };
   f.api.sendToFrontend = payload => { f.replies.push(payload); onBackend(payload); };
   const ctx = {
@@ -23,7 +25,7 @@ async function harness() {
     sendToBackend(payload: Parameters<typeof f.service.receive>[0]) { requests.push(payload as typeof requests[number]); void f.service.receive(payload, 'alice', 'ui-session'); },
     ui: {
       createFloatWidget(options: { width: number; height: number }) { const w = { root: dom.window.document.createElement('div'), visible: false, destroyed: false, ...options }; dom.window.document.body.append(w.root); widgets.push(w); return { ...w, root: w.root, setFullscreen(v: boolean) { w.root.dataset.fullscreen = String(v); }, setVisible(v: boolean) { w.visible = v; }, setSize(width: number, height: number) { w.width = width; w.height = height; }, getPosition() { return { x: 8, y: 8 }; }, moveTo() {}, destroy() { w.destroyed = true; w.root.remove(); } }; },
-      registerInputBarAction() { return { onClick() { return sub(); }, setEnabled() {}, destroy() {} }; },
+      registerInputBarAction() { return { onClick(callback: () => void) { inputAction = callback; return sub(); }, setEnabled() {}, destroy() {} }; },
     },
     registerMessageAction(options: { onClick: (id: string) => void }) { messageAction = options.onClick; return { destroy() {} }; },
     state: { get() { return { chatId: 'chat-a' }; }, subscribe(_key: string, callback: typeof stateCallback) { stateCallback = callback; return sub(); } },
@@ -34,8 +36,28 @@ async function harness() {
   const root = widgets[1].root.shadowRoot!;
   const click = (selector: string) => { const element = root.querySelector<HTMLButtonElement>(selector); if (!element) throw new Error(`Missing ${selector}`); element.click(); };
   await until(() => root.querySelector('.chat-name')?.textContent === 'The Lighthouse');
-  return { f, dom, root, widgets, requests, click, teardown, get ready() { return ready; }, get subscriptions() { return subscriptions; }, select: (id: string) => messageAction(id), switch: (id: string | null) => stateCallback({ chatId: id }), event: (payload: unknown) => eventCallback(payload) };
+  return { f, dom, root, widgets, requests, click, teardown, open: () => inputAction(), get ready() { return ready; }, get subscriptions() { return subscriptions; }, select: (id: string) => messageAction(id), switch: (id: string | null) => stateCallback({ chatId: id }), event: (payload: unknown) => eventCallback(payload) };
 }
+
+test('plain HTTP without randomUUID starts the mascot, both menu actions, and chat switching', async () => {
+  const h = await harness(true);
+  expect(globalThis.crypto.randomUUID).toBeUndefined();
+  expect(h.ready).toBe(true); expect(h.widgets).toHaveLength(2);
+  expect(h.widgets[0].visible).toBe(true); expect(h.widgets[1].visible).toBe(false);
+  h.widgets[0].root.shadowRoot!.querySelector('button')!.click(); expect(h.widgets[1].visible).toBe(true);
+  h.click('.close'); expect(h.widgets[1].visible).toBe(false);
+  h.open(); expect(h.widgets[1].visible).toBe(true);
+  h.select('m1'); await until(() => !!h.root.querySelector('.raw'));
+  expect(h.root.querySelector<HTMLTextAreaElement>('.raw')!.value).toContain('orbs');
+  const firstBind = h.requests.find(r => r.action === 'bind')!;
+  h.switch('chat-b'); await until(() => h.root.querySelector('.chat-name')!.textContent === 'Other chat');
+  const lastBind = h.requests.filter(r => r.action === 'bind').at(-1)!;
+  expect(lastBind.client).toBe(firstBind.client); expect(lastBind.binding).not.toBe(firstBind.binding);
+  expect(new Set(h.requests.map(r => r.id)).size).toBe(h.requests.length);
+  h.switch(null); expect(h.widgets.every(w => !w.visible)).toBe(true);
+  h.teardown(); expect(h.widgets.every(w => w.destroyed)).toBe(true); expect(h.subscriptions).toBe(0);
+});
+
 test('UI selects a source range, applies without a confirmation screen, and undoes it', async () => {
   const h = await harness(); expect(h.ready).toBe(true); expect(h.widgets[0].visible).toBe(true);
   h.select('m1'); await until(() => !!h.root.querySelector('.raw'));

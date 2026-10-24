@@ -8,12 +8,17 @@ import { CSS } from './style';
 
 type Tab = 'home' | 'edit' | 'slop' | 'chat' | 'gallery' | 'notebook' | 'settings';
 const TABS: [Tab, string][] = [['home', 'Kazz'], ['edit', 'Editor'], ['slop', 'De-slop'], ['chat', 'Chat'], ['gallery', 'Gallery'], ['notebook', 'Notebook'], ['settings', 'Settings']];
+function randomId(): string {
+  // These are opaque correlation IDs. getRandomValues also works on LAN HTTP,
+  // where browsers do not expose the secure-context-only crypto.randomUUID.
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('');
+}
 export function setup(ctx: SpindleFrontendContext): () => void {
   const stateAPI = ctx.state;
   if (!stateAPI) throw new Error('KazzWare requires the Lumiverse 1.2.5 frontend state API. Update Lumiverse and reload.');
   ctx.deferReady();
   const disposers: (() => void)[] = [];
-  const client = crypto.randomUUID(); let binding = crypto.randomUUID(); let chatId: string | null = null;
+  const client = randomId(); let binding = randomId(); let chatId: string | null = null;
   let destroyed = false; let opened = false; let tab: Tab = 'home'; let view: View | undefined;
   let target: Message | undefined; let range: Range | undefined; let selectedText = ''; let selectedMessageId: string | null = null; let selectionRequest = 0;
   let direction = ''; let askDraft = ''; let slopDraft: string | undefined; let settingsDraft: Settings | undefined;
@@ -42,7 +47,7 @@ export function setup(ctx: SpindleFrontendContext): () => void {
   }
   function rpc<T = unknown>(action: string, data: Record<string, unknown> = {}): Promise<T> {
     if (destroyed) return Promise.reject(new Error('KazzWare closed.'));
-    const id = crypto.randomUUID();
+    const id = randomId();
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => { pending.delete(id); reject(new Error('Kazz did not receive a response. Reload to check completed changes.')); }, 610_000);
       pending.set(id, { resolve: result => resolve(result as T), reject, timer });
@@ -123,7 +128,7 @@ export function setup(ctx: SpindleFrontendContext): () => void {
     const next = value && typeof value === 'object' && 'chatId' in value ? (value as { chatId: string | null }).chatId : null;
     if (next === chatId && view) return;
     for (const item of pending.values()) { clearTimeout(item.timer); item.reject(new Error('Chat changed.')); } pending.clear();
-    binding = crypto.randomUUID(); chatId = next; view = undefined; target = undefined; range = undefined; direction = ''; askDraft = ''; slopDraft = undefined; settingsDraft = undefined; selectedText = ''; selectedMessageId = null; pageId = ''; busy = 0;
+    binding = randomId(); chatId = next; view = undefined; target = undefined; range = undefined; direction = ''; askDraft = ''; slopDraft = undefined; settingsDraft = undefined; selectedText = ''; selectedMessageId = null; pageId = ''; busy = 0;
     frame?.destroy(); frame = undefined; mascot.setVisible(!!chatId); panel.setVisible(!!chatId && opened); inputAction.setEnabled(!!chatId);
     render();
     if (chatId) void run('bind', {}, 'Kazz is here. Pick a message or ask a favor.'); else { void rpc('bind').catch(() => {}); notify('Open a chat to wake Kazz.'); }

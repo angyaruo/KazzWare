@@ -1,10 +1,11 @@
-# Alpha verification · 2026-10-24
+# Alpha 0.1.1 verification · 2026-10-24
 
 ## Confirmed locally
 
 - Windows x64, Bun **1.4.4** (`38afee6c8`), Node 22.15.1, TypeScript 5.9.3.
 - `tsc --noEmit`: passed against `lumiverse-spindle-types` 0.6.49.
-- `bun test`: **27 passed, 0 failed**, 88 assertions, five test files.
+- `bun test`: **28 passed, 0 failed**, 103 assertions, five test files.
+- HTTP startup regression: with browser crypto and `randomUUID` explicitly unavailable, the original 0.1.0 frontend failed before creating a widget with `TypeError: crypto.randomUUID is not a function`. The fixed frontend passes startup, mascot and input-bar opening, message-action selection, unique request IDs, chat-binding changes, no-chat hiding, and teardown. jsdom does not enforce secure-context restrictions itself, so the test removes the API explicitly.
 - `bun scripts/build.ts`: generated backend/frontend ESM bundles; PNGs are embedded and no runtime imports remain.
 - `bun scripts/check-host.ts <checkout>`: the exact scanner extracted from Lumiverse main `3d74148383dded2b379f204532cf375b52bcd201` accepted the backend, with no declared capability exemptions. The harness also checks a known-prohibited Bun filesystem call to ensure the scanner is active.
 - `npm audit --omit=dev --audit-level=high`: zero production dependency vulnerabilities; this extension has no production dependencies.
@@ -13,13 +14,13 @@ The tests exercise the real service and frontend code with fake Spindle APIs and
 
 ## Not yet verified in a running Lumiverse instance
 
-No real provider calls, clean extension installation, visual browser rendering, physical iPhone/Android gestures, or real host reload/update cycle were performed. The API contract, emitted bundles and host scanner have been checked, but those checks do not replace a live smoke test. Treat 0.1.0 as an alpha for validation on a disposable/test chat first.
+The user installed 0.1.0 successfully but reported no frontend UI when opening Lumiverse over a plain HTTP network address; the startup regression above reproduces that failure. Version 0.1.1 has not yet been verified in their running instance. No real provider calls, successful visual browser rendering, physical iPhone/Android gestures, or real host reload/update cycle were performed by the automated checks. The API contract, emitted bundles and host scanner have been checked, but those checks do not replace a live smoke test. Treat 0.1.1 as an alpha for validation on a disposable/test chat first.
 
 The GitHub workflow is configured to rerun type checks, tests, builds and a tracked-bundle diff on pushes/PRs. Its result is separate from the local evidence above; do not infer a green CI run from this file.
 
 ## Live smoke test
 
-1. Install the prebuilt extension, grant its declared permissions and enable it. Open a test chat; verify Kazz appears only while a chat is active.
+1. Install/update the prebuilt extension, grant its declared permissions and enable it. Refresh the browser and confirm version 0.1.1 in the extension manager. Open a test chat over a plain HTTP network address as well as HTTPS/localhost; verify Kazz appears only while a chat is active and opens from the mascot, input-bar action, and message action.
 2. Choose a saved connection in KazzWare Settings. Reform a message, Undo it, then repeat with a Markdown/Unicode selection. Verify the source outside the selection is byte-for-byte unchanged.
 3. Start an edit and switch chats before it completes. The old result must not alter either chat. Start another edit, manually change the source before completion, and verify it refuses the stale write.
 4. Make a Kazz edit, then a manual edit. Verify Undo refuses to overwrite the manual revision. Reload the page and verify the journal and notebook persist.
