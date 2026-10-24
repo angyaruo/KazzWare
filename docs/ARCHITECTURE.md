@@ -1,0 +1,54 @@
+# KazzWare 0.1.0 architecture
+
+## Runtime and dependencies
+
+The baseline is Lumiverse main `3d74148383dded2b379f204532cf375b52bcd201`, version 1.2.5, with `lumiverse-spindle-types` 0.6.49. Staging-only APIs are not required. Bun 1.4.4 builds two ESM bundles; TypeScript 5.9.3 checks the SDK contract. Bun's test runner and jsdom 26.1.0 exercise backend operations and frontend DOM handlers. `@types/bun` 1.3.11 and `@types/jsdom` 21.1.7 are development types only. The npm lockfile contains the complete transitive toolchain; no npm dependency is imported by the deployed extension.
+
+`shared.ts` defines the versioned wire protocol, persistence types, validation, exact source-range replacement and literal slop matching. `service.ts` contains the backend service and the bounded assistant tool loop. `frontend.ts` owns host UI handles, state subscriptions, correlation IDs and teardown. `gallery.ts` escapes all model/user strings and produces the complete iframe document. `style.ts` scopes styles inside extension-owned shadow roots. Bundles contain the original art as data URLs; no large images travel through frontend/backend messages.
+
+## Ownership and cancellation
+
+The host-authenticated user ID comes from `onFrontendMessage`, never from the payload. Every request has a random document client ID, chat binding token and request ID. Session routing uses the host frontend-session ID when present; payload matching still rejects responses belonging to a different document or binding. `chats.get(chatId, userId)` validates access before the message facade is used. Every generation explicitly supplies both `userId` and the user-selected `connection_id`.
+
+Changing chats replaces the binding and aborts all old controllers. Responses from the old binding cannot update the UI. Jobs serialize per user/chat, including across tabs, so extension writes and state saves cannot race each other. The last 500 request promises are deduplicated in memory; the last 2000 gallery-trigger message IDs are stored durably. A job times out after 10 minutes. Stop aborts unfinished generations; completed edits and their Undo records remain.
+
+## Immediate edits and Undo
+
+An edit captures the message ID, full source text and active swipe. The backend rereads and compares the source before generation and again before writing. It persists a `prepared` Undo record first, then writes only the message's `content`, then marks the record `applied`. If the final save fails, the prepared record can still restore the message. If the first journal save fails, no message mutation occurs. Undo checks the current text and active swipe against the stored result before restoring the original.
+
+The host message API has no atomic compare-and-swap operation. These rereads protect against ordinary stale edits, but another extension/manual write in the final host read/write interval can still race. This is a documented host limitation, not a transaction guarantee. Redo is not implemented. The Undo journal retains 20 message edits; a lorebook creation is not a message edit and is managed in Lumiverse.
+
+Selection offsets are UTF-16 source offsets. Rendering a Markdown selection back to source is accepted only when the selected text occurs exactly once. Otherwise the user selects the raw source inside KazzWare. Textarea offsets are mapped back to the original CRLF/bare-CR source before applying changes. Replacement is a deterministic prefix + replacement + suffix splice; only the interior is model-generated. Partial surrogate selections are rejected.
+
+The no-plot-advancement rule is a prompt constraint, not a provable semantic guarantee. Empty, oversized, malformed and known-truncated model responses are rejected. De-slop results are scanned again using the saved literal phrases and Unicode-aware boundaries; remaining matches cause rejection. It does not invent an automatic second paid retry.
+
+## Assistant and context
+
+The assistant uses a JSON action protocol rather than assuming the selected provider supports native function calling. It has up to eight tool steps plus a final answer. Search scans the full current chat and returns 20 results per page; history pages expose 20 messages. Reference tools read cards, personas, presets/blocks, lorebooks/entries, databanks/documents, connection labels, current-chat memories and saved Kazz summaries. Message edits and new lorebooks stay in the bound chat. Unknown actions are rejected.
+
+Working context includes a bounded recent-message window, character card, chat persona (or active persona fallback), activated lore and the latest Kazz summary. Reference text is explicitly treated as data rather than instructions. Limits and truncation markers are included in tool results. Connection metadata and credentials are not supplied to the model. Generic known credential fields in reference objects are redacted as defense in depth.
+
+Full-chat summaries roll through 24,000-character chunks, incorporating the previous summary each time. The source is checked again before saving. Summaries support up to 1,000,000 source characters and can take multiple provider calls; they may still omit details because model summarization is lossy. The notebook retains ten summaries. They live in Kazz storage, not Lumiverse's native memory system.
+
+Lorebook creation first summarizes the chat, validates 1–20 entries, creates the book, records its ID, adds entries, and merges the new ID into `chat.metadata.chat_world_book_ids`. Existing metadata and book IDs are preserved. Creation is not atomic: interrupted operations can leave a partially filled or unattached book, visible by ID in the notebook. It is never silently deleted.
+
+## Fandom and UI
+
+Gallery automation is opt-in and only accepts successful `GENERATION_ENDED` events explicitly tagged `normal`, with an existing assistant message ID. Swipes, regenerations, continuations, user messages and quiet Kazz calls do not count. The active frontend must be present. Consumed events are persisted before generation to prevent duplicate billing across clients. Failures consume that interval; Fresh drama is the explicit retry. The last 30 pages are retained; each page allows 200 local comments and per-user post likes. Pausing automation preserves saved pages.
+
+Model-generated prose becomes forum, thread or wiki documents through escaped templates. No arbitrary model HTML or scripts execute. The host sandbox has an opaque origin and the manifest requests no CORS proxy or unsafe-eval permission. Its bridge accepts only like/comment payloads whose post IDs belong to the displayed saved page. Pages never invoke agent tools or modify the roleplay.
+
+Two host widgets hold the mascot and menu. The menu is fullscreen on narrow screens to permit native mobile scrolling; the desktop header is draggable. The host clamps mascot movement. CSS is contained in shadow roots, every host handle and event listener is disposed on teardown, and the menu clears old chat content immediately when switching. Routine UI replies carry message previews, Undo metadata and gallery page metadata; full sources/pages are loaded individually to avoid the 4 MB WebSocket cap. The visible Kazz transcript shows the latest 50 turns with long-turn excerpts; storage retains 100 turns. Every chat starts with its own settings and a gallery-off default.
+
+## Permissions
+
+`generation` selects and calls saved connections; `chats` reads chat identity and attaches new lorebooks; `chat_mutation` reads/edits messages; `ui_panels` provides widgets/actions. `characters`, `personas`, `presets`, `world_books`, `databanks`, and `memories` support reference tools, with `world_books` also creating lorebooks. Spindle user storage is a free capability. The extension does not request interception, external network, native filesystem/process, secret storage, unrestricted regex, app manipulation or arbitrary code-execution capabilities.
+
+## Sources
+
+- [Lumiverse developer docs](https://docs.lumiverse.chat/)
+- [Manifest and permissions](https://docs.lumiverse.chat/getting-started/manifest/)
+- [Pinned Lumiverse source](https://github.com/prolix-oc/Lumiverse/tree/3d74148383dded2b379f204532cf375b52bcd201)
+- [Installer and scanner](https://github.com/prolix-oc/Lumiverse/blob/3d74148383dded2b379f204532cf375b52bcd201/src/spindle/manager.service.ts)
+- [Sandbox implementation](https://github.com/prolix-oc/Lumiverse/blob/3d74148383dded2b379f204532cf375b52bcd201/frontend/src/lib/spindle/sandbox-frame.ts)
+- [Mousey / LumiAgent](https://github.com/AMousePad/LumiAgent), a conceptual reference; no implementation code was copied.
