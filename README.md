@@ -12,7 +12,7 @@ A chat-bound companion extension for Lumiverse, built around Kazz: a foul-mouthe
 - Peanut Gallery is opt-in and produces interactive fictional pages at a configurable message interval.
 - The user chooses Kazz's model connection; working state follows the active chat.
 
-## First alpha · 0.1.0
+## Alpha · 0.1.1
 
 The implementation and prebuilt bundles are included. Automated tests cover the backend and the real frontend handlers using a simulated host. A live Lumiverse install, real model response quality, and physical mobile-device behavior still need validation. See [verification](docs/VERIFICATION.md) for the exact checks and remaining limits.
 
@@ -34,11 +34,13 @@ Undo is in Editor and retains the latest 20 Kazz message edits across reloads. I
 
 Requires **Lumiverse 1.2.5+**, its required **Bun 1.4.4+** runtime, and a configured model connection. No additional runtime packages or provider credentials belong in this extension.
 
-**From GitHub, once the implementation branch has been pushed:** in Lumiverse's extension manager, install `https://github.com/angyaruo/KazzWare` and select the implementation branch `feat/kazzware-companion` until it is merged. The repository is private; Lumiverse's server must have Git credentials that can read it. The source checkout must include the tracked `dist/` files. Do not delete those files and rely on Lumiverse's generic auto-build: KazzWare's custom build embeds the mascot assets.
+**From GitHub:** in Lumiverse's extension manager, install `https://github.com/angyaruo/KazzWare` from the `main` branch. The repository is private; Lumiverse's server must have Git credentials that can read it. The source checkout must include the tracked `dist/` files. Do not delete those files and rely on Lumiverse's generic auto-build: KazzWare's custom build embeds the mascot assets.
 
 **From the supplied runtime ZIP:** extract its `kazzware` folder into the Lumiverse server's configured data directory under `extensions/`, so the manifest is at `data/extensions/kazzware/spindle.json` (or the equivalent custom data path). Use **Import local** in the extension manager, review the requested permissions and enable KazzWare. The runtime package contains prebuilt files and no dependency-install step. This operation is performed on the machine running Lumiverse, not merely the phone browser viewing it.
 
 Open a chat, open KazzWare → Settings, select a connection and save. Peanut Gallery starts disabled. Message editing, summary creation and gallery generation spend tokens through your selected provider; long summaries may use several calls.
+
+**Updating from 0.1.0:** once 0.1.1 is on your installed branch, update KazzWare in the extension manager and refresh the Lumiverse browser page. Confirm its card shows **0.1.1**, then open a chat. This fixes the missing mascot/menu on plain HTTP network addresses. You do not need to reinstall the extension, reset its data, or change your server address.
 
 ## Data and scope
 

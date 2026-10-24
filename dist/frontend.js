@@ -69,14 +69,17 @@ var CSS = `
 
 // src/frontend.ts
 var TABS = [["home", "Kazz"], ["edit", "Editor"], ["slop", "De-slop"], ["chat", "Chat"], ["gallery", "Gallery"], ["notebook", "Notebook"], ["settings", "Settings"]];
+function randomId() {
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
 function setup(ctx) {
   const stateAPI = ctx.state;
   if (!stateAPI)
     throw new Error("KazzWare requires the Lumiverse 1.2.5 frontend state API. Update Lumiverse and reload.");
   ctx.deferReady();
   const disposers = [];
-  const client = crypto.randomUUID();
-  let binding = crypto.randomUUID();
+  const client = randomId();
+  let binding = randomId();
   let chatId = null;
   let destroyed = false;
   let opened = false;
@@ -134,7 +137,7 @@ function setup(ctx) {
   function rpc(action, data = {}) {
     if (destroyed)
       return Promise.reject(new Error("KazzWare closed."));
-    const id = crypto.randomUUID();
+    const id = randomId();
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         pending.delete(id);
@@ -316,7 +319,7 @@ function setup(ctx) {
       item.reject(new Error("Chat changed."));
     }
     pending.clear();
-    binding = crypto.randomUUID();
+    binding = randomId();
     chatId = next;
     view = undefined;
     target = undefined;
