@@ -79,9 +79,11 @@ test('UI chat switch clears old prose immediately and ignores its late response'
 });
 test('settings persist the selected connection and teardown removes resources', async () => {
   const h = await harness(); h.click('[data-tab=settings]');
+  expect(h.dom.window.document.querySelectorAll('[data-kazzware-font]')).toHaveLength(1);
   const interval = h.root.querySelector<HTMLInputElement>('.interval')!; interval.value = '3'; interval.dispatchEvent(new h.dom.window.Event('input')); h.click('.save-settings');
   await until(() => h.f.state().settings.interval === 3); expect(h.f.state().settings.connectionId).toBe('connection');
   h.teardown(); expect(h.widgets.every(w => w.destroyed)).toBe(true); expect(h.subscriptions).toBe(0);
+  expect(h.dom.window.document.querySelectorAll('[data-kazzware-font]')).toHaveLength(0);
 });
 test('narrow screens use the host fullscreen surface for native mobile scrolling', async () => {
   const h = await harness(); Object.defineProperty(h.dom.window, 'innerWidth', { value: 390, configurable: true });

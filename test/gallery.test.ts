@@ -7,6 +7,9 @@ test('untrusted fandom HTML cannot execute; trusted clicks/comments use a narrow
   expect((dom.window as unknown as { pwned: unknown }).pwned).toBeUndefined(); expect(dom.window.document.querySelectorAll('script')).toHaveLength(1);
   dom.window.document.querySelector<HTMLButtonElement>('[data-vote]')!.click(); expect(sent[0]).toEqual({ kind: 'vote', postId: 'post' });
   dom.window.document.querySelector<HTMLButtonElement>('[data-reply]')!.click(); expect(dom.window.document.querySelector('form')!.hidden).toBe(false);
-  dom.window.document.querySelector('textarea')!.value = 'My hot take'; dom.window.document.querySelector('form')!.dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));
+  dom.window.document.querySelector('textarea')!.value = 'My hot take';
+  const post = dom.window.document.querySelector<HTMLButtonElement>('[data-submit]')!;
+  expect(post.type).toBe('button'); // Lumiverse allows scripts but blocks native form submission.
+  post.click();
   expect(sent[1]).toEqual({ kind: 'comment', postId: 'post', text: 'My hot take' }); dom.window.close();
 });
