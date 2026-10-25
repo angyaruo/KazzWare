@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0 — 2026-10-24
+
+Rebuild the UI around Kazz's friendly-malware persona: a chrome utility frame, red warning labels, oversized condensed type, crooked shortcut windows, ice-blue and off-white stickers, a larger mascot illustration, and a labeled floating Kazz. Restyle every tool and all three fandom layouts. Keep all seven navigation buttons visible, reset scrolling when changing tabs, and retain mobile fullscreen behavior, keyboard focus indicators, and reduced-motion support.
+
+Bundle Barlow Condensed with its SIL Open Font License; no external font requests. Include a self-contained interactive preview using the shipped frontend with sample data and no AI/Lumiverse connection.
+
+Fix Peanut Gallery comment posting in Lumiverse's scripts-only sandbox: the Post comment button now calls the trusted message bridge directly instead of relying on blocked native form submission. Existing immediate edits, Undo, HTTP startup support, permissions, and stored data remain compatible.
+
 ## 0.1.1 — 2026-10-24
 
 Fix frontend startup when Lumiverse is opened through a plain HTTP network address. Version 0.1.0 called the secure-context-only `crypto.randomUUID()` before registering the mascot, menu, or message action. Frontend correlation IDs now use `crypto.getRandomValues()`, which is available over HTTP. No permissions or stored data change.

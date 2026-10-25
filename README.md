@@ -12,9 +12,9 @@ A chat-bound companion extension for Lumiverse, built around Kazz: a foul-mouthe
 - Peanut Gallery is opt-in and produces interactive fictional pages at a configurable message interval.
 - The user chooses Kazz's model connection; working state follows the active chat.
 
-## Alpha · 0.1.1
+## Alpha · 0.2.0
 
-The implementation and prebuilt bundles are included. Automated tests cover the backend and the real frontend handlers using a simulated host. A live Lumiverse install, real model response quality, and physical mobile-device behavior still need validation. See [verification](docs/VERIFICATION.md) for the exact checks and remaining limits.
+The implementation and prebuilt bundles are included. The UI now uses a cybercore collage of crooked utility windows, chrome, warning-red labels, and bundled condensed lettering. Automated tests cover the backend and real frontend handlers; the shipped frontend is also checked in a browser preview with sample data. Live model response quality and physical mobile-device behavior still need validation. See [verification](docs/VERIFICATION.md) for exact checks and remaining limits.
 
 Kazz floats in the active chat. Tap him or the input-bar KazzWare action to open the menu. On desktop, drag the mascot or the menu header; on narrow screens, the menu uses a fullscreen surface while the mascot remains floating. The three supplied Kazz illustrations switch between idle, attentive and working states.
 
@@ -40,7 +40,7 @@ Requires **Lumiverse 1.2.5+**, its required **Bun 1.4.4+** runtime, and a config
 
 Open a chat, open KazzWare → Settings, select a connection and save. Peanut Gallery starts disabled. Message editing, summary creation and gallery generation spend tokens through your selected provider; long summaries may use several calls.
 
-**Updating from 0.1.0:** once 0.1.1 is on your installed branch, update KazzWare in the extension manager and refresh the Lumiverse browser page. Confirm its card shows **0.1.1**, then open a chat. This fixes the missing mascot/menu on plain HTTP network addresses. You do not need to reinstall the extension, reset its data, or change your server address.
+**Updating:** once 0.2.0 is on your installed branch, update KazzWare in the extension manager and refresh the Lumiverse browser page. Confirm its card shows **0.2.0**, then open a chat. You do not need to reinstall the extension or reset its data. The HTTP startup fix from 0.1.1 is included.
 
 ## Data and scope
 
@@ -57,10 +57,14 @@ npm ci --ignore-scripts
 bun run typecheck
 bun test
 bun run build
+# Write a self-contained interactive preview beside the repository
+bun run preview
 # Optional: check against the actual scanner in a Lumiverse checkout
 bun scripts/check-host.ts /path/to/Lumiverse
 ```
 
-The lockfile pins the development toolchain. There are no runtime dependencies. `src/backend.ts` runs in Spindle's backend runtime; `src/frontend.ts` exports the frontend setup/teardown. `scripts/build.ts` embeds the original PNGs into the frontend bundle. Commit updated `dist/` with every source change. The GitHub workflow checks types, tests and reproducible bundles with Bun 1.4.4.
+The lockfile pins the development toolchain. There are no runtime dependencies. `src/backend.ts` runs in Spindle's backend runtime; `src/frontend.ts` exports frontend setup/teardown. `scripts/build.ts` embeds the original PNGs and display font into the frontend bundle. Commit updated `dist/` with every source change. The GitHub workflow checks types, tests and reproducible bundles with Bun 1.4.4.
+
+Open the generated `KazzWare-preview.html` in a browser to explore the actual shipped UI with sample story data. Changes last only until that page reloads; it never contacts Lumiverse or an AI provider. Its mock host supports visual and interaction checks, not backend verification.
 
 See [architecture](docs/ARCHITECTURE.md), [research](docs/LUMIVERSE-RESEARCH.md), and [art provenance](assets/README.md). Independent, unofficial project designed to interoperate with Lumiverse; implementation is original and does not copy Mousey's code. No redistribution license is granted by this repository yet.
