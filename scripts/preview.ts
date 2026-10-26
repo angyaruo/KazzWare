@@ -21,9 +21,24 @@ const script = String.raw`
 const { setup } = await import(FRONTEND_URL);
 const state = INITIAL_STATE;
 const messages = [{id:'m1',content:'The lighthouse turned its pale eye toward the shore. Elias closed his hand around the key.\n\n"Not tonight," he said. The light found them anyway.',name:'Elias',is_user:false,swipe_id:0,index_in_chat:0}];
+messages.push(
+  {id:'m2',content:'I stopped at the foot of the stairs. \"You said the light was broken.\"',name:'You',is_user:true,swipe_id:0,index_in_chat:1},
+  {id:'m3',content:'Elias looked past me at the window. The beam turned inland again.\n\n\"It is.\" He said it too quietly. Something scraped along the floor above us, slow enough to count.\n\nI watched his hand close around the key.',name:'Elias',is_user:false,swipe_id:0,index_in_chat:2},
+  {id:'m4',content:'I held out my hand. \"Give me the key.\"',name:'You',is_user:true,swipe_id:0,index_in_chat:3},
+  {id:'m5',content:'For a moment he almost did. Then the scraping stopped.\n\nThree knocks came from the other side of the door. Elias stepped in front of it. \"Whatever you hear, let me answer.\"',name:'Elias',is_user:false,swipe_id:0,index_in_chat:4}
+);
 let chatId = 'demo-chat', stateListener = () => {}, backendListener = () => {}, inputClick = () => {};
 const host = document.querySelector('#stage');
-function view(){return {chatName:chatId === 'other-chat' ? 'The last train / sample chat' : 'Blackwater / sample chat',messages,totalMessages:1,connections:[{id:'demo',name:'Sample connection',model:'Preview only'}],state};}
+const story = document.querySelector('#story');
+function drawStory(){story.replaceChildren(...messages.map(m=>{
+  const article=document.createElement('article');article.dataset.previewMessage=m.id;
+  const title=document.createElement('h2');title.textContent=m.name+' / '+(m.index_in_chat+1);
+  const prose=document.createElement('p');prose.textContent=m.content;
+  const action=document.createElement('button');action.textContent='Native action '+(m.index_in_chat+1);action.onclick=()=>{document.querySelector('#native-result').textContent='Native action '+(m.index_in_chat+1)+' clicked'};
+  article.append(title,prose,action);return article;
+}));}
+drawStory();
+function view(){return {chatName:chatId === 'other-chat' ? 'The last train / sample chat' : 'Blackwater / sample chat',messages,totalMessages:messages.length,connections:[{id:'demo',name:'Sample connection',model:'Preview only'}],state};}
 function reply(req,result){queueMicrotask(() => backendListener({...req,ok:true,result}));}
 const ctx = {
   deferReady(){},ready(){},
@@ -31,28 +46,28 @@ const ctx = {
   events:{on(){return ()=>{}}},
   onBackendMessage(fn){backendListener=fn;return ()=>{}},
   sendToBackend(req){
-    if(req.action === 'message') return reply(req,messages[0]);
+    if(req.action === 'message') return reply(req,messages.find(m=>m.id===req.data.messageId));
     if(req.action === 'page') return reply(req,state.pages.find(p=>p.id===req.data.pageId));
     if(req.action === 'summaryContent') return reply(req,state.summaries[0].text);
     if(req.action === 'settings') state.settings = req.data.settings;
     if(req.action === 'react') {const page=state.pages.find(p=>p.id===req.data.pageId);if(req.data.kind==='vote'){page.votes=page.votes.includes(req.data.postId)?page.votes.filter(id=>id!==req.data.postId):[...page.votes,req.data.postId]}else page.comments.push({id:String(Date.now()),postId:req.data.postId,author:'You',body:req.data.text});}
     if(req.action === 'ask') state.turns.push({role:'user',content:req.data.text},{role:'assistant',content:'Preview mode, boss. The real me uses your chosen connection. These demo messages stay in this page.'});
-    if(req.action === 'edit') {const before=messages[0].content, replacement='The light swept ashore. Elias gripped the key. "Not tonight." It found them anyway.';const r=req.data.range;const after=r?before.slice(0,r.start)+'the edited selection'+before.slice(r.end):replacement;state.undo.push({id:String(Date.now()),messageId:'m1',label:'Preview edit',before,after,swipe:0,createdAt:Date.now(),status:'applied'});messages[0].content=after;}
-    if(req.action === 'undo'){const u=state.undo.find(u=>u.id===req.data.undoId);messages[0].content=u.before;u.status='undone';}
+    if(req.action === 'edit') {const message=messages.find(m=>m.id===req.data.messageId),before=message.content, replacement='The light swept ashore. Elias gripped the key. "Not tonight." It found them anyway.';const r=req.data.range;const after=r?before.slice(0,r.start)+'the edited selection'+before.slice(r.end):replacement;state.undo.push({id:String(Date.now()),messageId:message.id,label:'Preview edit',before,after,swipe:0,createdAt:Date.now(),status:'applied'});message.content=after;drawStory();}
+    if(req.action === 'undo'){const u=state.undo.find(u=>u.id===req.data.undoId);messages.find(m=>m.id===u.messageId).content=u.before;u.status='undone';drawStory();}
     if(req.action==='summary') state.summaries.push({...state.summaries[0],id:String(Date.now())});
     if(req.action==='lorebook') state.lorebooks.push({id:'demo-book',name:'Blackwater / preview lorebook'});
     reply(req,view());
   },
   ui:{
     createFloatWidget(options){
-      const wrap=document.createElement('div');wrap.className=options.width===110?'pet-wrap':'panel-wrap';const root=document.createElement('div');wrap.append(root);host.append(wrap);
+      const wrap=document.createElement('div');wrap.className=options.width===110?'pet-wrap':'panel-wrap';const content=document.createElement('div');content.className='widget-content';const root=document.createElement('div');content.append(root);wrap.append(content);host.append(wrap);
       const size=(w,h)=>{wrap.style.width=w+'px';wrap.style.height=h+'px'};size(options.width,options.height);
       return {root,setVisible(v){wrap.hidden=!v},setSize:size,setFullscreen(v){wrap.classList.toggle('fullscreen',v);if(v){wrap.style.width='100%';wrap.style.height='100dvh'}},getPosition(){return {x:12,y:12}},moveTo(){},destroy(){wrap.remove()}};
     },
     registerInputBarAction(){return {onClick(fn){inputClick=fn;return ()=>{}},setEnabled(){},destroy(){}}}
   },
   registerMessageAction(){return {destroy(){}}},
-  dom:{getMessageId(){return null},createSandboxFrame({html,initialHeight}){
+  dom:{getMessageId(el){return el.closest('[data-preview-message]')?.dataset.previewMessage??null},findMessageElement(id){return Array.from(story.children).find(el=>el.dataset.previewMessage===id)??null},listMessageElements(){return Array.from(story.children).map(element=>({messageId:element.dataset.previewMessage,element}))},createSandboxFrame({html,initialHeight}){
     const element=document.createElement('iframe');element.sandbox='allow-scripts';element.style.height=initialHeight+'px';
     element.srcdoc=html.replace('<script>', '<script>window.spindleSandbox={postMessage:function(data){parent.postMessage(data,"*")}};');
     let fn=()=>{};const listener=event=>{if(event.source===element.contentWindow)fn(event.data)};window.addEventListener('message',listener);
@@ -68,7 +83,7 @@ window.addEventListener('pagehide',teardown,{once:true});
 `;
 const body = script.replace('FRONTEND_URL', JSON.stringify(frontend)).replace('INITIAL_STATE', JSON.stringify(state));
 await mkdir(dirname(destination), { recursive: true });
-await Bun.write(destination, `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KazzWare / Cybercore preview</title><style>
-*{box-sizing:border-box}body{margin:0;background:#24292e;background-image:linear-gradient(#ffffff06 1px,transparent 1px),linear-gradient(90deg,#ffffff06 1px,transparent 1px);background-size:32px 32px;color:#d7e0e5;font:13px/1.5 system-ui,sans-serif}.preview-tools{position:fixed;left:28px;top:30px;width:225px;padding:18px;border:1px solid #71818a;background:#13191e}.preview-tools h1{font-size:22px;margin:0 0 10px}.preview-tools p{color:#afbfc8}.preview-tools button,.preview-tools select{display:block;width:100%;padding:10px;margin-top:10px;color:#eaf2f6;background:#26353f;border:1px solid #657d8b;border-radius:4px}.panel-wrap{position:fixed;right:26px;top:12px;max-height:calc(100dvh - 24px)}.pet-wrap{position:fixed;bottom:20px;left:275px}.panel-wrap.fullscreen{inset:0;max-height:100dvh;z-index:2}.pet-wrap[hidden],.panel-wrap[hidden]{display:none}@media(max-width:600px){.preview-tools{left:12px;top:12px;width:calc(100% - 24px)}.pet-wrap{left:auto;right:20px;bottom:30px;z-index:1}}
-</style></head><body><aside class="preview-tools"><h1>KazzWare 0.2.0</h1><p>Interactive UI preview. Sample story only. No AI calls, no Lumiverse connection, no saved data.</p><button id="reopen">Open KazzWare</button><select id="switch" aria-label="Sample chat"><option value="demo-chat">Blackwater</option><option value="other-chat">The last train</option><option value="">No active chat</option></select><button id="restart">Reset preview</button></aside><div id="stage"></div><script type="module">${body.replaceAll('</script', '<\\/script')}</script></body></html>`);
+await Bun.write(destination, `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KazzWare / Floating companion preview</title><style>
+*{box-sizing:border-box}body{margin:0;background:#24292e;background-image:linear-gradient(#ffffff06 1px,transparent 1px),linear-gradient(90deg,#ffffff06 1px,transparent 1px);background-size:32px 32px;color:#d7e0e5;font:13px/1.5 system-ui,sans-serif}.preview-tools{position:fixed;left:28px;top:30px;width:225px;padding:18px;border:1px solid #71818a;background:#13191e}.preview-tools h1{font-size:22px;margin:0 0 10px}.preview-tools p{color:#afbfc8}.preview-tools button,.preview-tools select{display:block;width:100%;padding:10px;margin-top:10px;color:#eaf2f6;background:#26353f;border:1px solid #657d8b;border-radius:4px}.panel-wrap{position:fixed;right:26px;top:12px;max-height:calc(100dvh - 24px)}.pet-wrap{position:fixed;bottom:20px;left:275px}.panel-wrap.fullscreen{inset:0;max-height:100dvh;z-index:2}.widget-content{width:100%;height:100%;pointer-events:auto}.story-shell{position:fixed;left:280px;top:30px;bottom:25px;right:28px;display:flex;flex-direction:column;background:#101319;border:1px solid #3c444e;border-radius:12px}.story-shell>header{padding:15px 22px;border-bottom:1px solid #343a43;color:#869ca9;font:10px monospace}.story-shell output{display:block;color:#bce9f3;margin-top:4px}#story{overflow:auto;flex:1;min-height:0;padding:24px;scrollbar-width:thin}#story article{margin:0 0 28px;padding:24px;border:1px solid #363f4c;border-left:3px solid #777fa7;border-radius:8px;background:#181d24;max-width:700px}#story h2{font-size:13px;color:#bcbcd6;margin:0 0 18px}#story p{white-space:pre-wrap;font:16px/1.8 Georgia,serif;max-width:560px;color:#c7cbd0}#story button{padding:6px 9px;background:#252c36;color:#b9c6d2;border:1px solid #4b5562;font-size:10px;margin-top:16px}.native-composer{padding:15px 22px;border-top:1px solid #3c444e}.native-composer input{background:#202630;color:#eee;padding:12px;width:100%;border:1px solid #52606c;border-radius:7px}.pet-wrap[hidden],.panel-wrap[hidden]{display:none}@media(max-width:900px){.story-shell{left:16px;right:16px;top:150px}.preview-tools{position:relative;left:16px;top:10px;width:calc(100% - 32px);padding:10px;display:flex;gap:8px;align-items:center}.preview-tools h1{font-size:14px;white-space:nowrap}.preview-tools p{display:none}.preview-tools button,.preview-tools select{font-size:10px;padding:8px;margin:0}.pet-wrap{left:auto;right:12px}}@media(max-width:600px){.story-shell{inset:110px 6px 8px}.preview-tools{left:12px;top:12px;width:calc(100% - 24px)}.pet-wrap{left:auto;right:20px;bottom:30px;z-index:1}}
+</style></head><body><aside class="preview-tools"><h1>KazzWare 0.3.0</h1><p>Interactive UI preview. Sample story only. Scroll the chat to test Follow view. Use Pick from chat to tap a message. No AI calls or saved data.</p><button id="reopen">Open KazzWare</button><select id="switch" aria-label="Sample chat"><option value="demo-chat">Blackwater</option><option value="other-chat">The last train</option><option value="">No active chat</option></select><button id="restart">Reset preview</button></aside><section class="story-shell"><header>BLACKWATER / SAMPLE CHAT <output id="native-result" aria-live="polite"></output></header><div id="story" tabindex="0" aria-label="Native chat preview"></div><div class="native-composer"><input placeholder="Native chat input · click-through test" aria-label="Native chat input"></div></section><div id="stage"></div><script type="module">${body.replaceAll('</script', '<\\/script')}</script></body></html>`);
 console.log(`Preview written to ${destination}`);
