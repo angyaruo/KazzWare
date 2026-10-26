@@ -1,10 +1,14 @@
 # Kazz artwork
 
-The three PNGs were supplied by the project owner as KazzWare's mascot references and assets. They are bundled unchanged, with original dimensions and transparency. No image-generation service or external image hosting is used at runtime.
+The seven PNGs were supplied by the project owner as KazzWare's mascot references and assets. They are bundled unchanged, with original dimensions and transparency. No image-generation service or external image hosting is used at runtime.
 
-- `kazz-idle.png`: reclining pose, used while the menu is closed.
-- `kazz-active.png`: attentive pose, used while the menu is open.
-- `kazz-working.png`: holographic alert pose, used during requests.
+- `kazz-curled.png`: “Elfo chibi en espiral mecánica.png”, the floating launcher (image 6).
+- `kazz-perched.png`: “Elfo cibernético entre garras mecánicas.png”, the home composition.
+- `kazz-listening.png`: “Chibi gótico con cola escorpión mecánica.png”, leaning over the chat input.
+- `kazz-wink.png`: “Elfo chibi y cola mecánica.png”, the quiet Gallery.
+- `kazz-idle.png`, `kazz-active.png`, `kazz-working.png`: original poses retained in source; not embedded in the 0.3.0 frontend.
+
+The owner’s two hand-drawn layouts inform the floating composition. Those reference drawings are not shipped.
 
 The project owner has not granted a public redistribution license for this artwork. Do not treat dependency licenses as a license to the mascot images.
 

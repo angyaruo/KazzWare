@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0 — 2026-10-26
+
+Replace the outer window with a transparent companion composition based on the owner’s sketches: Kazz in the center, a speech bubble, separate crooked action tiles, and a quick input strip. Chat puts the leaning pose above the input and floating dialogue strips. Add the four new unmodified PNGs; use the curled pose for the launcher and hide the duplicate launcher while the menu is open. Scope click-through styling to this panel’s host wrappers.
+
+Follow view chooses the mounted native message closest to the reading line after scrolling settles, respecting clipped scroll containers. Manual picks, source selection and edit directions pin the target. Pick from chat temporarily tucks the menu away and consumes the chosen native click. Keep the recent-message list and Send to Kazz action. Clear stale targets, suppress late selection replies, lock changes while a job runs, and remove markers/listeners on teardown.
+
+Expand the isolated preview with a scrollable sample native chat and add regression coverage for scrolling, pinning, native picks, cancellation, delayed replies, chat switches and clipped/virtualized messages. No permissions, backend behavior, stored-data format or runtime dependencies change.
+
 ## 0.2.0 — 2026-10-24
 
 Rebuild the UI around Kazz's friendly-malware persona: a chrome utility frame, red warning labels, oversized condensed type, crooked shortcut windows, ice-blue and off-white stickers, a larger mascot illustration, and a labeled floating Kazz. Restyle every tool and all three fandom layouts. Keep all seven navigation buttons visible, reset scrolling when changing tabs, and retain mobile fullscreen behavior, keyboard focus indicators, and reduced-motion support.
