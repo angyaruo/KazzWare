@@ -7,13 +7,15 @@ const cleanups: (() => void)[] = [];
 afterEach(() => { while (cleanups.length) cleanups.pop()!(); });
 async function harness(plainHTTP = false) {
   const dom = new JSDOM('<!doctype html><html><body></body></html>', { pretendToBeVisual: true, url: plainHTTP ? 'http://192.0.2.1:7860' : 'https://lumiverse.test' });
+  // The in-process fake backend shares globals with jsdom; retain its WebCrypto digest.
+  Object.defineProperty(dom.window.crypto, 'subtle', { value: globalThis.crypto.subtle });
   // jsdom does not enforce secure-context restrictions; match a browser on LAN HTTP.
   if (plainHTTP) Object.defineProperty(dom.window.crypto, 'randomUUID', { value: undefined });
   const previous = new Map<string, PropertyDescriptor | undefined>();
   for (const [key, value] of Object.entries({ window: dom.window, document: dom.window.document, Node: dom.window.Node, Element: dom.window.Element, crypto: dom.window.crypto })) { previous.set(key, Object.getOwnPropertyDescriptor(globalThis, key)); Object.defineProperty(globalThis, key, { configurable: true, value }); }
   cleanups.push(() => { dom.window.close(); for (const [key, descriptor] of previous) { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else Reflect.deleteProperty(globalThis, key); } });
   const f = fake(); await f.ready(); let onBackend: (payload: unknown) => void = () => {};
-  let stateCallback: (value: unknown) => void = () => {}; let eventCallback: (value: unknown) => void = () => {};
+  let stateCallback: (value: unknown) => void = () => {}; const eventCallbacks = new Map<string, Set<(value: unknown) => void>>();
   let messageAction: (id: string) => void = () => {}; let inputAction: () => void = () => {}; let ready = false; let subscriptions = 0;
   const widgets: { root: HTMLElement; visible: boolean; destroyed: boolean; width: number; height: number; x: number; y: number }[] = [];
   const requests: { action: string; data: Record<string, unknown>; id: string; client: string; binding: string }[] = [];
@@ -30,7 +32,7 @@ async function harness(plainHTTP = false) {
     },
     registerMessageAction(options: { onClick: (id: string) => void }) { messageAction = options.onClick; return { destroy() {} }; },
     state: { get() { return { chatId: 'chat-a' }; }, subscribe(_key: string, callback: typeof stateCallback) { stateCallback = callback; return sub(); } },
-    events: { on(_event: string, callback: typeof eventCallback) { eventCallback = callback; return sub(); } },
+    events: { on(event: string, callback: (value: unknown) => void) { const listeners = eventCallbacks.get(event) || new Set(); listeners.add(callback); eventCallbacks.set(event, listeners); const unsubscribe = sub(); return () => { listeners.delete(callback); unsubscribe(); }; } },
     dom: {
       createElement(tag: string) { return dom.window.document.createElement(tag); },
       inject(target: Element, html: string) { const wrapper = dom.window.document.createElement('div'); wrapper.innerHTML = html; target.append(wrapper); return wrapper; },
@@ -60,7 +62,7 @@ async function harness(plainHTTP = false) {
     await new Promise(resolve => setTimeout(resolve, 190));
     return dom.window.document.querySelector('[data-kazzware-owned=selection]')!.shadowRoot!;
   }
-  return { f, dom, root, widgets, requests, highlight, click, teardown, native, held, hold: () => { holdMessages = true; }, release: () => { holdMessages = false; for (const reply of held.splice(0)) onBackend(reply); }, open: () => inputAction(), get ready() { return ready; }, get subscriptions() { return subscriptions; }, select: (id: string) => messageAction(id), switch: (id: string | null) => stateCallback({ chatId: id }), event: (payload: unknown) => eventCallback(payload) };
+  return { f, dom, root, widgets, requests, highlight, click, teardown, native, held, hold: () => { holdMessages = true; }, release: () => { holdMessages = false; for (const reply of held.splice(0)) onBackend(reply); }, open: () => inputAction(), get ready() { return ready; }, get subscriptions() { return subscriptions; }, select: (id: string) => messageAction(id), switch: (id: string | null) => stateCallback({ chatId: id }), event: (payload: unknown, event = 'GENERATION_ENDED') => eventCallbacks.get(event)?.forEach(fn => fn(payload)) };
 }
 
 test('plain HTTP without randomUUID starts the mascot, both menu actions, and chat switching', async () => {
@@ -251,4 +253,83 @@ test('extending a native highlight across messages discards the earlier partial 
   h.dom.window.document.dispatchEvent(new h.dom.window.Event('selectionchange'));
   expect(h.dom.window.document.querySelector<HTMLElement>('[data-kazzware-owned=selection]')!.hidden).toBe(true);
   expect(h.requests.some(r => r.action === 'edit')).toBe(false);
+});
+
+
+test('selection surface waits through a held mouse/touch gesture and debounces keyboard changes', async () => {
+  const h = await harness(); const message = h.native('m1', '', 250);
+  const portal = document.querySelector<HTMLElement>('[data-kazzware-owned=selection]')!;
+  message.element.dispatchEvent(new h.dom.window.MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+  await h.highlight('m1', 0, 2); expect(portal.hidden).toBe(true);
+  await h.highlight('m1', 0, 10); expect(portal.hidden).toBe(true);
+  expect(h.requests.filter(r => r.action === 'message')).toHaveLength(0);
+  h.dom.window.dispatchEvent(new h.dom.window.Event('pointerup'));
+  expect(portal.hidden).toBe(true); await new Promise(r => setTimeout(r, 190));
+  expect(portal.hidden).toBe(false); expect(portal.shadowRoot!.querySelector('.quote')!.textContent).toBe('He watched');
+  // A fresh keyboard selection is hidden immediately and appears only after settling.
+  const selection = h.dom.window.getSelection()!, range = selection.getRangeAt(0); range.setEnd(message.element.querySelector('p')!.firstChild!, 15);
+  document.dispatchEvent(new h.dom.window.Event('selectionchange'));
+  expect(portal.hidden).toBe(true);
+  await new Promise(r => setTimeout(r, 80)); range.setEnd(message.element.querySelector('p')!.firstChild!, 24);
+  document.dispatchEvent(new h.dom.window.Event('selectionchange'));
+  await new Promise(r => setTimeout(r, 100)); expect(portal.hidden).toBe(true);
+  await new Promise(r => setTimeout(r, 90)); expect(portal.hidden).toBe(false);
+  expect(portal.shadowRoot!.querySelector('.quote')!.textContent).toBe('He watched the pale orbs');
+  message.element.dispatchEvent(new h.dom.window.MouseEvent('pointerdown', { bubbles: true }));
+  h.dom.window.dispatchEvent(new h.dom.window.Event('pointercancel'));
+  await new Promise(r => setTimeout(r, 190)); expect(portal.hidden).toBe(true);
+});
+
+test('opening beside a moved mascot preserves its position through navigation and close/reopen', async () => {
+  const h = await harness(), pet = h.widgets[0], panel = h.widgets[1];
+  const button = pet.root.shadowRoot!.querySelector('button')!;
+  button.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', shiftKey: true, bubbles: true }));
+  button.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'ArrowDown', shiftKey: true, bubbles: true }));
+  const original = { x: pet.x, y: pet.y }; button.click();
+  expect(panel.x).toBe(original.x + 110 + 12); expect(panel.y).toBeGreaterThanOrEqual(8);
+  h.click('[data-tab=settings]'); expect({ x: pet.x, y: pet.y }).toEqual(original);
+  const position = { x: panel.x, y: panel.y }; h.click('[data-tab=chat]'); expect({ x: panel.x, y: panel.y }).toEqual(position);
+  h.click('.close'); expect({ x: pet.x, y: pet.y }).toEqual(original);
+  button.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', shiftKey: true, bubbles: true }));
+  button.click(); expect(panel.x).toBe(original.x + 40 + 110 + 12); expect(pet.x).toBe(original.x + 40);
+});
+
+async function enableCommentary(h: Awaited<ReturnType<typeof harness>>) {
+  h.open(); h.click('[data-tab=settings]');
+  const checkbox = h.root.querySelector<HTMLInputElement>('.commentary-enabled')!; checkbox.checked = true;
+  h.click('.save-settings'); await until(() => h.f.state().settings.commentaryEnabled);
+  await until(() => !h.root.querySelector<HTMLButtonElement>('.save-settings')!.disabled); h.click('.close');
+}
+test('opt-in commentary handles messages and swipes without opening the menu or writing to chat', async () => {
+  const h = await harness(); const event = { chatId: 'chat-a', messageId: 'm1', generationType: 'normal' };
+  h.event(event); await settleView(); expect(h.f.modelInputs).toHaveLength(0);
+  await enableCommentary(h); h.f.outputs.push('Well, that is suspicious as hell.');
+  h.event(event); await until(() => h.f.modelInputs.length === 1);
+  const portal = document.querySelector<HTMLElement>('[data-kazzware-owned=commentary]')!;
+  await until(() => !portal.hidden); expect(portal.textContent).toBe('');
+  expect(portal.shadowRoot!.querySelector('span')!.textContent).toContain('suspicious');
+  expect(h.widgets[1].visible).toBe(false); expect(h.f.updates).toHaveLength(0);
+  h.event({ chatId: 'chat-a', message: h.f.messages.get('chat-a')![0] }, 'MESSAGE_SENT'); await settleView();
+  expect(h.f.modelInputs).toHaveLength(1);
+  portal.shadowRoot!.querySelector('button')!.click(); expect(portal.hidden).toBe(true);
+  h.event(event); await settleView(); expect(portal.hidden).toBe(true);
+  const message = h.f.messages.get('chat-a')![0]; message.swipe_id = 1; message.content = 'The door opened.';
+  h.f.outputs.push('Doors. Always a terrible idea.');
+  h.event({ chatId: 'chat-a', message, action: 'navigated' }, 'MESSAGE_SWIPED');
+  await until(() => h.f.modelInputs.length === 2); await until(() => !portal.hidden);
+  expect(portal.shadowRoot!.querySelector('span')!.textContent).toContain('Doors.');
+  h.event({ ...event, generationType: 'quiet' }); h.event({ ...event, error: 'Failed' });
+  await settleView(); expect(h.f.modelInputs).toHaveLength(2);
+});
+
+test('switching commentary off cancels its pending response and prevents a late bubble', async () => {
+  const h = await harness(); await enableCommentary(h);
+  const gate = deferred(); h.f.setGate(() => gate.promise); h.f.outputs.push('Too late.');
+  h.event({ chatId: 'chat-a', messageId: 'm1', generationType: 'swipe' });
+  await until(() => h.f.modelInputs.length === 1);
+  h.open(); h.click('[data-tab=settings]'); h.root.querySelector<HTMLInputElement>('.commentary-enabled')!.checked = false; h.click('.save-settings');
+  expect((h.f.modelInputs[0] as { signal: AbortSignal }).signal.aborted).toBe(true);
+  gate.resolve(); await until(() => !h.f.state().settings.commentaryEnabled); h.click('.close');
+  await settleView(); expect(document.querySelector<HTMLElement>('[data-kazzware-owned=commentary]')!.hidden).toBe(true);
+  h.event({ chatId: 'chat-a', messageId: 'm1', generationType: 'normal' }); await settleView(); expect(h.f.modelInputs).toHaveLength(1);
 });

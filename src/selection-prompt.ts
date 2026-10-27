@@ -20,6 +20,7 @@ export function selectionPrompt(dom: SpindleDOMHelper, options: Options) {
   let sequence = 0, timer: ReturnType<typeof setTimeout> | undefined, selected: NativeSelection | undefined;
   let message: Message | undefined, range: Range | undefined, undoId = '', working = false, dismissed = '';
   let lastAnchor: DOMRect | undefined;
+  let pointerHeld = false;
   const signature = (selection: NativeSelection) => selection.messageId + '\0' + selection.text;
   const say = (text: string, error = false) => { feedback.textContent = text; feedback.classList.toggle('error', error); };
   const close = () => { if (selected) dismissed = signature(selected); ++sequence; clearTimeout(timer); selected = undefined; message = undefined; range = undefined; portal.hidden = true; working = false; };
@@ -47,15 +48,13 @@ export function selectionPrompt(dom: SpindleDOMHelper, options: Options) {
     root.querySelector('.quote')!.textContent = next.text.slice(0, 200); say('Checking the highlight…');
     portal.hidden = false; position();
     const request = sequence;
-    timer = setTimeout(() => {
-      void options.load(next.messageId).then(value => {
-        if (request !== sequence || !options.available()) return;
-        message = value; range = nativeRange(value.content, next.text);
-        if (!range) { say('Cannot match this highlight uniquely. Select a smaller plain-text passage in the message.', true); return; }
-        more.disabled = false; apply.disabled = !input.value.trim();
-        say(`Only this passage · ${range.end - range.start} characters`); position();
-      }).catch(error => { if (request === sequence) say((error as Error).message, true); });
-    }, 160);
+    void options.load(next.messageId).then(value => {
+      if (request !== sequence || !options.available()) return;
+      message = value; range = nativeRange(value.content, next.text);
+      if (!range) { say('Cannot match this highlight uniquely. Select a smaller plain-text passage in the message.', true); return; }
+      more.disabled = false; apply.disabled = !input.value.trim();
+      say(`Only this passage · ${range.end - range.start} characters`); position();
+    }).catch(error => { if (request === sequence) say((error as Error).message, true); });
   }
   input.addEventListener('input', () => { apply.disabled = working || !range || !input.value.trim(); });
   root.querySelector('.close')!.addEventListener('click', close);
@@ -78,13 +77,29 @@ export function selectionPrompt(dom: SpindleDOMHelper, options: Options) {
     working = false; undo.disabled = false; if (ok) { undo.hidden = true; say('Undone. Original wording restored.'); } else say('Undo could not be applied. Check Editor for details.', true);
   });
   const escape = (event: KeyboardEvent) => { if (!portal.hidden && event.key === 'Escape') { event.stopImmediatePropagation(); close(); } };
-  const outside = (event: PointerEvent) => { if (!portal.hidden && !event.composedPath().includes(portal)) close(); };
-  document.addEventListener('selectionchange', capture); document.addEventListener('pointerup', capture);
+  // Selection changes fire repeatedly during mouse drags and mobile handle moves.
+  // Delay the *surface*, not just the lookup; never place controls under a held pointer.
+  const schedule = () => {
+    clearTimeout(timer);
+    if (pointerHeld || working || document.activeElement === portal) return;
+    const next = readNativeSelection(dom);
+    if (selected && (!next || signature(next) !== signature(selected))) close();
+    timer = setTimeout(capture, 160);
+  };
+  const outside = (event: PointerEvent) => {
+    if (event.composedPath().includes(portal)) return;
+    pointerHeld = true; close();
+  };
+  const release = () => { pointerHeld = false; schedule(); };
+  const cancel = () => { pointerHeld = false; close(); };
+  document.addEventListener('selectionchange', schedule); window.addEventListener('pointerup', release, true);
+  window.addEventListener('pointercancel', cancel, true); window.addEventListener('blur', cancel);
   document.addEventListener('pointerdown', outside, true); document.addEventListener('keydown', escape, true);
   document.addEventListener('scroll', position, true); window.addEventListener('resize', position);
   window.visualViewport?.addEventListener('resize', position); window.visualViewport?.addEventListener('scroll', position);
-  return { close, reset() { close(); dismissed = ''; }, destroy() {
-    close(); portal.remove(); document.removeEventListener('selectionchange', capture); document.removeEventListener('pointerup', capture);
+  return { close, reset() { pointerHeld = false; close(); dismissed = ''; }, destroy() {
+    close(); portal.remove(); document.removeEventListener('selectionchange', schedule); window.removeEventListener('pointerup', release, true);
+    window.removeEventListener('pointercancel', cancel, true); window.removeEventListener('blur', cancel);
     document.removeEventListener('pointerdown', outside, true); document.removeEventListener('keydown', escape, true);
     document.removeEventListener('scroll', position, true); window.removeEventListener('resize', position);
     window.visualViewport?.removeEventListener('resize', position); window.visualViewport?.removeEventListener('scroll', position);
