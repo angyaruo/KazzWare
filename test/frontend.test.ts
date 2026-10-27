@@ -116,7 +116,7 @@ test('settings persist the selected connection and teardown removes resources', 
 test('narrow screens keep a smaller floating surface that can be moved', async () => {
   const h = await harness(); Object.defineProperty(h.dom.window, 'innerWidth', { value: 390, configurable: true });
   h.dom.window.dispatchEvent(new h.dom.window.Event('resize'));
-  expect(h.widgets[1].root.dataset.fullscreen).toBe('false'); expect(h.widgets[1].width).toBeCloseTo(299.2); expect(h.widgets[1].height).toBeLessThanOrEqual(688); expect(h.widgets[0].root.dataset.fullscreen).toBeUndefined();
+  expect(h.widgets[1].root.dataset.fullscreen).toBe('false'); expect(h.widgets[1].width).toBeCloseTo(374); expect(h.widgets[1].height).toBeLessThanOrEqual(688); expect(h.widgets[0].root.dataset.fullscreen).toBeUndefined();
 });
 test('highlight-only UI edits preserve CRLF outside the selected text', async () => {
   const h = await harness(); h.f.messages.get('chat-a')![0].content = 'First\r\nold\r\nlast';
@@ -152,7 +152,7 @@ test('follow view settles on the reading line and typing pins the message throug
 test('native picking consumes only the chosen click, Escape cancels, and teardown removes markers/listeners', async () => {
   const h = await harness(); const first = h.native('m1', '', 250); const second = h.native('m3', 'Pick me.', 600);
   let nativeClicks = 0; const nativeButton = second.element.querySelector('button')!; nativeButton.addEventListener('click', () => nativeClicks++);
-  h.open(); await settleView(); h.click('.pick-message');
+  h.open(); h.click('[data-go=edit]'); await settleView(); h.click('.pick-message');
   expect(h.root.querySelector('.shell')!.classList.contains('picking')).toBe(true);
   nativeButton.click(); await until(() => h.root.querySelector<HTMLElement>('.target-name')?.dataset.messageId === 'm3');
   expect(nativeClicks).toBe(0); expect(h.root.querySelector('.follow-target')!.getAttribute('aria-pressed')).toBe('false');
@@ -186,7 +186,7 @@ test('changing a manual target clears the old editor while loading; missing visi
 });
 
 test('cancelling a pick resumes following even when the earlier selection reply is still pending', async () => {
-  const h = await harness(); h.native('m1', '', 250); h.hold(); h.open(); await settleView(); expect(h.held.length).toBe(1);
+  const h = await harness(); h.native('m1', '', 250); h.hold(); h.open(); h.click('[data-go=edit]'); await settleView(); expect(h.held.length).toBe(1);
   h.click('.pick-message'); h.click('.cancel-pick'); await settleView(); expect(h.held.length).toBe(2);
   h.release(); await until(() => h.root.querySelector('.target-name')!.textContent === '#1 · Elias');
   expect(h.root.querySelector('.follow-target')!.getAttribute('aria-pressed')).toBe('true');
@@ -194,7 +194,7 @@ test('cancelling a pick resumes following even when the earlier selection reply 
 
 test('scrolling back to the loaded message invalidates a slower reply for the message passed over', async () => {
   const h = await harness(); const first = h.native('m1', '', 250); const second = h.native('m3', 'Scrolled past.', 850);
-  h.open(); await settleView(); h.hold(); first.move(-300); second.move(250);
+  h.open(); h.click('[data-go=edit]'); await settleView(); h.hold(); first.move(-300); second.move(250);
   h.dom.window.document.dispatchEvent(new h.dom.window.Event('scroll')); await settleView(); expect(h.held.length).toBe(1);
   first.move(250); second.move(850); h.dom.window.document.dispatchEvent(new h.dom.window.Event('scroll')); await settleView();
   h.release(); await settleView(); expect(h.root.querySelector('.target-name')!.textContent).toBe('#1 · Elias');
@@ -295,11 +295,57 @@ test('opening beside a moved mascot preserves its position through navigation an
 });
 
 async function enableCommentary(h: Awaited<ReturnType<typeof harness>>) {
-  h.open(); h.click('[data-tab=settings]');
+  h.open(); h.click('[data-tab=commentary]');
   const checkbox = h.root.querySelector<HTMLInputElement>('.commentary-enabled')!; checkbox.checked = true;
-  h.click('.save-settings'); await until(() => h.f.state().settings.commentaryEnabled);
-  await until(() => !h.root.querySelector<HTMLButtonElement>('.save-settings')!.disabled); h.click('.close');
+  h.click('.save-commentary'); await until(() => h.f.state().settings.commentaryEnabled);
+  await until(() => !h.root.querySelector<HTMLButtonElement>('.save-commentary')!.disabled); h.click('.close');
 }
+test('home exposes every feature directly and config contains only occasional preferences', async () => {
+  const h = await harness(); h.open();
+  expect(h.root.querySelectorAll('.orbit [data-go]')).toHaveLength(9);
+  h.click('[data-go=commentary]'); expect(h.root.querySelector('.commentary-enabled')).not.toBeNull();
+  h.click('[data-tab=home]'); h.click('[data-go=naming]'); expect(h.root.querySelector('.name-now')).not.toBeNull();
+  h.click('.quick-settings'); expect(h.root.querySelector('.auto-name')).toBeNull(); expect(h.root.querySelector('.commentary-enabled')).toBeNull();
+  h.click('[data-tab=home]'); h.click('[data-go=swipes]'); expect(h.root.querySelector<HTMLDetailsElement>('.merge-drawer')!.open).toBe(true);
+  const native = h.native('m1', '', 250); h.click('.pick-message'); native.element.querySelector('p')!.click();
+  await until(() => h.root.querySelector<HTMLElement>('.target-name')?.dataset.messageId === 'm1');
+  expect(h.root.querySelector<HTMLElement>('.shell')!.dataset.screen).toBe('swipes');
+});
+
+test('mobile peeker docks after a drag and preserves the desktop launcher position', async () => {
+  const h = await harness(), pet = h.widgets[0], button = pet.root.shadowRoot!.querySelector('button')!;
+  button.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', shiftKey: true, bubbles: true }));
+  const desktop = { x: pet.x, y: pet.y };
+  Object.defineProperty(h.dom.window, 'innerWidth', { value: 390, configurable: true });
+  h.dom.window.dispatchEvent(new h.dom.window.Event('resize'));
+  expect(pet.width).toBe(64); expect(pet.height).toBe(84); expect(button.classList.contains('peek')).toBe(true);
+  const pointer = (type: string, x: number, y: number) => new h.dom.window.MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 });
+  button.dispatchEvent(pointer('pointerdown', 340, 400)); h.dom.window.dispatchEvent(pointer('pointermove', 30, 300)); h.dom.window.dispatchEvent(pointer('pointerup', 30, 300));
+  expect(pet.x).toBe(8); expect(button.classList.contains('peek-left')).toBe(true);
+  const dockedY = pet.y; button.click(); h.click('[data-go=commentary]'); h.click('.close'); expect(pet.y).toBe(dockedY); expect(pet.x).toBe(8);
+  Object.defineProperty(h.dom.window, 'innerWidth', { value: 1024, configurable: true }); h.dom.window.dispatchEvent(new h.dom.window.Event('resize'));
+  expect({ x: pet.x, y: pet.y }).toEqual(desktop); expect(pet.width).toBe(110); expect(button.classList.contains('peek')).toBe(false);
+});
+
+test('commentary preferences persist; until-closed survives skipped events and timed bubbles expire', async () => {
+  const h = await harness(); h.open(); h.click('[data-go=commentary]');
+  h.root.querySelector<HTMLInputElement>('.commentary-enabled')!.checked = true;
+  h.root.querySelector<HTMLInputElement>('.commentary-interval')!.value = '2';
+  h.click('[data-duration="0"]'); h.click('[data-width="360"]'); h.click('.save-commentary');
+  await until(() => !h.root.querySelector<HTMLButtonElement>('.save-commentary')!.disabled);
+  expect(h.f.state().settings.commentaryDuration).toBe(0); expect(h.f.state().settings.commentaryWidth).toBe(360); expect(h.f.state().settings.commentaryInterval).toBe(2);
+  h.click('.close'); const message = h.f.messages.get('chat-a')![0];
+  const event = () => h.event({ chatId: 'chat-a', message, action: 'navigated' }, 'MESSAGE_SWIPED');
+  event(); await settleView(); expect(h.f.modelInputs).toHaveLength(0);
+  message.swipe_id++; message.content = 'The light turns.'; h.f.outputs.push('Somebody should unplug that thing.'); event();
+  const portal = document.querySelector<HTMLElement>('[data-kazzware-owned=commentary]')!;
+  await until(() => !portal.hidden); expect(portal.style.width).toContain('360px');
+  message.swipe_id++; message.content = 'He waits.'; event(); await settleView(); expect(portal.hidden).toBe(false); expect(h.f.modelInputs).toHaveLength(1);
+  h.open(); h.click('[data-tab=commentary]'); h.click('[data-duration="14"]');
+  h.root.querySelector<HTMLInputElement>('.commentary-duration')!.value = '3'; h.click('.save-commentary');
+  await until(() => !h.root.querySelector<HTMLButtonElement>('.save-commentary')!.disabled); h.click('.close');
+  await new Promise(resolve => setTimeout(resolve, 3100)); expect(portal.hidden).toBe(true);
+}, 10000);
 test('opt-in commentary handles messages and swipes without opening the menu or writing to chat', async () => {
   const h = await harness(); const event = { chatId: 'chat-a', messageId: 'm1', generationType: 'normal' };
   h.event(event); await settleView(); expect(h.f.modelInputs).toHaveLength(0);
@@ -327,7 +373,7 @@ test('switching commentary off cancels its pending response and prevents a late 
   const gate = deferred(); h.f.setGate(() => gate.promise); h.f.outputs.push('Too late.');
   h.event({ chatId: 'chat-a', messageId: 'm1', generationType: 'swipe' });
   await until(() => h.f.modelInputs.length === 1);
-  h.open(); h.click('[data-tab=settings]'); h.root.querySelector<HTMLInputElement>('.commentary-enabled')!.checked = false; h.click('.save-settings');
+  h.open(); h.click('[data-tab=commentary]'); h.root.querySelector<HTMLInputElement>('.commentary-enabled')!.checked = false; h.click('.save-commentary');
   expect((h.f.modelInputs[0] as { signal: AbortSignal }).signal.aborted).toBe(true);
   gate.resolve(); await until(() => !h.f.state().settings.commentaryEnabled); h.click('.close');
   await settleView(); expect(document.querySelector<HTMLElement>('[data-kazzware-owned=commentary]')!.hidden).toBe(true);
@@ -367,8 +413,8 @@ test('Summary+ edits timeline notes, saves planned beats, and keeps injection op
 });
 
 test('namer settings save the interval and manual naming exposes title Undo', async () => {
-  const h = await harness(); h.open(); h.click('[data-tab=settings]');
-  h.root.querySelector<HTMLInputElement>('.auto-name')!.checked = true; h.root.querySelector<HTMLInputElement>('.name-interval')!.value = '30'; h.click('.save-settings');
+  const h = await harness(); h.open(); h.click('[data-tab=naming]');
+  h.root.querySelector<HTMLInputElement>('.auto-name')!.checked = true; h.root.querySelector<HTMLInputElement>('.name-interval')!.value = '30'; h.click('.save-naming');
   await until(() => h.f.state().settings.nameInterval === 30); expect(h.f.state().settings.autoName).toBe(true);
   await until(() => !h.root.querySelector<HTMLButtonElement>('.name-now')!.disabled); h.f.outputs.push('{"name":"The Lighthouse Keeps Its Secrets"}'); h.click('.name-now');
   await until(() => !!h.root.querySelector('[data-name-undo]')); expect(h.root.querySelector('.chat-name')!.textContent).toBe('The Lighthouse Keeps Its Secrets');
@@ -378,7 +424,8 @@ test('namer settings save the interval and manual naming exposes title Undo', as
 test('Summary+ automation follows completed replies, swipe navigation and native edits without counting them as new titles', async () => {
   const h = await harness(); h.f.state().settings.timelineAuto = true; h.f.state().settings.autoName = true;
   h.open(); h.click('[data-tab=settings]'); h.click('.reload-state');
-  await until(() => h.root.querySelector<HTMLInputElement>('.auto-name')!.checked);
+  await until(() => !h.root.querySelector<HTMLButtonElement>('.save-settings')!.disabled); h.click('[data-tab=naming]');
+  expect(h.root.querySelector<HTMLInputElement>('.auto-name')!.checked).toBe(true);
   const m = h.f.messages.get('chat-a')![0];
   h.f.outputs.push('{"name":"The Lighthouse Watches"}', '{"summary":"He waits.","storyDate":"","storyTime":"","location":"","characters":""}');
   h.event({ chatId: 'chat-a', messageId: m.id, generationType: 'normal' });

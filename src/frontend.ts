@@ -1,5 +1,8 @@
 import type { SpindleFrontendContext, SpindleSandboxFrameHandle } from 'lumiverse-spindle-types';
-import idle from '../assets/kazz-curled.png';
+import cover from '../assets/kazz-cover.png';
+import { mascotLayout } from './mascot-layout';
+import { renderFeatureControls } from './feature-controls';
+import { icon } from './icons';
 import perched from '../assets/kazz-perched.png';
 import listening from '../assets/kazz-listening.png';
 import wink from '../assets/kazz-wink.png';
@@ -16,8 +19,8 @@ import { nativeRange } from './native-selection';
 import { selectionPrompt } from './selection-prompt';
 import { inlineGallery } from './inline-gallery';
 
-type Tab = 'home' | 'edit' | 'slop' | 'chat' | 'gallery' | 'notebook' | 'settings' | 'timeline';
-const TABS: [Tab, string][] = [['home', 'Kazz'], ['edit', 'Editor'], ['slop', 'De-slop'], ['chat', 'Chat'], ['gallery', 'Gallery'], ['notebook', 'Notebook'], ['timeline', 'Summary+'], ['settings', 'Settings']];
+type Tab = 'home' | 'edit' | 'slop' | 'chat' | 'gallery' | 'notebook' | 'settings' | 'timeline' | 'swipes' | 'commentary' | 'naming';
+const TABS: [Tab, string][] = [['home', '← Home'], ['edit', 'Editor'], ['slop', 'De-slop'], ['chat', 'Chat'], ['gallery', 'Gallery'], ['notebook', 'Notebook'], ['timeline', 'Summary+'], ['swipes', 'Swipes'], ['commentary', 'Commentary'], ['naming', 'Chat naming'], ['settings', 'Settings']];
 function randomId(): string {
   // These are opaque correlation IDs. getRandomValues also works on LAN HTTP,
   // where browsers do not expose the secure-context-only crypto.randomUUID.
@@ -33,8 +36,8 @@ export function setup(ctx: SpindleFrontendContext): () => void {
     /* Lumiverse wraps a float root in content + widget divs. Scope this to our
        marked panel only; transparent gaps must reach the native chat. */
     div:has(> div > [data-kazzware-surface]), div:has(> [data-kazzware-surface]) { pointer-events:none!important; touch-action:auto!important; box-shadow:none!important }
-    [data-kazzware-target] { outline:2px dashed #bce9f3!important; outline-offset:-3px }
-    [data-kazzware-candidate] { outline:3px solid #ff4b57!important; outline-offset:-3px; cursor:crosshair!important }
+    [data-kazzware-target] { outline:2px dashed #eceef0!important; outline-offset:-3px }
+    [data-kazzware-candidate] { outline:3px solid #eceef0!important; outline-offset:-3px; cursor:crosshair!important }
   `;
   document.head.append(fontStyle); disposers.push(() => fontStyle.remove());
   const client = randomId(); let binding = randomId(); let chatId: string | null = null;
@@ -43,11 +46,11 @@ export function setup(ctx: SpindleFrontendContext): () => void {
   let following = true; let picking = false; let followTimer: ReturnType<typeof setTimeout> | undefined; let autoPending = ''; let autoToken = 0;
   let marked: Element | null = null; let hovered: Element | null = null;
   let direction = ''; let askDraft = ''; let slopDraft: string | undefined; let settingsDraft: Settings | undefined;
-  let timelineShown = 30;
+  let timelineShown = 30; let commentaryDraft: Partial<Settings> = {}, namingDraft: Partial<Settings> = {};
   let pageId = ''; let frame: SpindleSandboxFrameHandle | undefined; let status = 'Open a chat to wake Kazz.'; let error = false; let busy = 0;
   const pending = new Map<string, { resolve: (result: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
   const mascot = positioned(ctx.ui.createFloatWidget({ width: 110, height: 110, initialPosition: { x: Math.max(0, window.innerWidth - 125), y: Math.max(0, window.innerHeight - 245) }, snapToEdge: false, chromeless: true, touchScrollMode: 'native', tooltip: 'KazzWare · your in-chat accomplice' }), 110, 110);
-  let panelWidth = Math.min(416, (window.innerWidth - 16) * .8), panelHeight = Math.min(688, (window.innerHeight - 24) * .8);
+  let panelWidth = Math.min(400, window.innerWidth - 16), panelHeight = Math.min(452, window.innerHeight - 24);
   const panel = positioned(ctx.ui.createFloatWidget({ width: panelWidth, height: panelHeight, initialPosition: { x: Math.max(8, window.innerWidth - 436), y: 12 }, snapToEdge: false, chromeless: true, touchScrollMode: 'native', tooltip: 'KazzWare' }), panelWidth, panelHeight);
   for (const widget of [mascot, panel]) { widget.root.style.width = '100%'; widget.root.style.height = '100%'; }
   panel.root.dataset.kazzwareSurface = '';
@@ -60,7 +63,8 @@ export function setup(ctx: SpindleFrontendContext): () => void {
   const root = panel.root.attachShadow({ mode: 'open' });
   root.innerHTML = `<style>${CSS}${STORY_CSS}</style><section class="shell" data-screen="home" aria-label="KazzWare"><header class="top"><div class="title" role="button" tabindex="0" aria-label="Move KazzWare menu; drag or use arrow keys" title="Drag to move · arrow keys also work"><div class="brand-line"><span class="brand">KAZZWARE<em>.exe</em></span><span class="badge">FRIENDLY MALWARE</span></div><div class="chat-name"></div></div><button class="quick-settings" aria-label="Connection settings">⚙</button><button class="icon close" aria-label="Close KazzWare">×</button></header><nav aria-label="KazzWare sections"></nav><main class="body"></main><footer class="status" role="status" aria-live="polite"><span></span><button class="cancel-pick" hidden>Cancel pick</button><button class="cancel" hidden>Stop</button></footer></section>`;
   const body = root.querySelector<HTMLElement>('.body')!; const nav = root.querySelector('nav')!; const statusBox = root.querySelector<HTMLElement>('.status')!;
-  const petDrag = draggable(petButton, mascot), panelDrag = draggable(root.querySelector<HTMLElement>('.title')!, panel);
+  const launcher = mascotLayout(mascot, petButton, petImage, () => view?.state.settings);
+  const petDrag = draggable(petButton, mascot, launcher.settled), panelDrag = draggable(root.querySelector<HTMLElement>('.title')!, panel);
   let artDrags: ReturnType<typeof draggable>[] = [];
   disposers.push(() => { petDrag.destroy(); panelDrag.destroy(); for (const drag of artDrags) drag.destroy(); });
   // Keep selection and scrolling gestures in the panel; its header remains the drag handle.
@@ -69,7 +73,7 @@ export function setup(ctx: SpindleFrontendContext): () => void {
   const notify = (text: string, failed = false) => { status = text; error = failed; paintStatus(); };
   function paintStatus() {
     statusBox.querySelector('span')!.textContent = status; statusBox.classList.toggle('error', error);
-    petButton.classList.toggle('busy', busy > 0); petImage.src = idle;
+    petButton.classList.toggle('busy', busy > 0);
     mascot.setVisible(!!chatId && !opened);
     (statusBox.querySelector('.cancel-pick') as HTMLButtonElement).hidden = !picking;
     (statusBox.querySelector('.cancel') as HTMLButtonElement).hidden = busy === 0;
@@ -122,7 +126,7 @@ export function setup(ctx: SpindleFrontendContext): () => void {
     }
     catch { if (origin === binding && target?.id === id) { target = undefined; range = undefined; } }
   }
-  function show(next: Tab = tab) { const changed = next !== tab; stopPicking(); if (!opened) openBeside(mascot, panel, panelWidth, panelHeight, view?.state.settings.mascotSize || 110); opened = true; tab = next; panel.setVisible(!!chatId); render(); if (changed) body.scrollTop = 0; scheduleFollow(); }
+  function show(next: Tab = tab) { const changed = next !== tab; stopPicking(); tab = next; resize(); if (!opened) openBeside(mascot, panel, panelWidth, panelHeight, launcher.width()); opened = true; panel.setVisible(!!chatId); render(); if (changed) body.scrollTop = 0; scheduleFollow(); }
   function hide() { panelDrag.cancel(); for (const drag of artDrags) drag.cancel(); stopPicking(); opened = false; invalidateSelection(); clearTimeout(followTimer); markTarget(); panel.setVisible(false); paintStatus(); petButton.focus(); }
   petButton.addEventListener('click', () => opened ? hide() : show());
   root.querySelector('.close')!.addEventListener('click', hide);
@@ -132,7 +136,7 @@ export function setup(ctx: SpindleFrontendContext): () => void {
   nav.innerHTML = TABS.map(([key, label], index) => `<button data-tab="${key}"><span class="nav-index" aria-hidden="true">0${index}</span>${label}</button>`).join('');
   nav.addEventListener('click', ev => { const button = (ev.target as Element).closest<HTMLButtonElement>('button'); if (button) show(button.dataset.tab as Tab); });
   root.addEventListener('keydown', ev => { if ((ev as KeyboardEvent).key === 'Escape') hide(); });
-  const inputAction = ctx.ui.registerInputBarAction({ id: 'kazzware-open', label: 'KazzWare', subtitle: 'Your in-chat accomplice', iconUrl: idle });
+  const inputAction = ctx.ui.registerInputBarAction({ id: 'kazzware-open', label: 'KazzWare', subtitle: 'Your in-chat accomplice', iconUrl: cover });
   disposers.push(inputAction.onClick(() => show())); disposers.push(() => inputAction.destroy());
   if (ctx.registerMessageAction) {
     const action = ctx.registerMessageAction({ id: 'kazzware-edit', label: 'Send to Kazz', onClick: id => { void selectMessage(id); } });
@@ -140,25 +144,26 @@ export function setup(ctx: SpindleFrontendContext): () => void {
   }
   async function selectMessage(id: string, highlighted = '', automatic = false) {
     if (busy || !chatId || (automatic && (!following || picking))) return;
+    const destination: Tab = picking && ['swipes', 'timeline'].includes(tab) ? tab : 'edit';
     if (!automatic) {
       stopPicking(); pinTarget();
-      if (target?.id !== id) { target = undefined; range = undefined; direction = ''; show('edit'); notify('Fetching the selected message…'); }
+      if (target?.id !== id) { target = undefined; range = undefined; direction = ''; show(destination); notify('Fetching the selected message…'); }
     }
     const origin = binding, sequence = ++selectionRequest;
     try {
       const message = await rpc<Message>('message', { messageId: id }); if (origin !== binding || sequence !== selectionRequest || destroyed || busy || (automatic && (!following || !opened || picking))) return;
       if (target?.id !== id) direction = '';
       target = message; range = highlighted ? nativeRange(message.content, highlighted) : undefined;
-      if (highlighted && !range) { target = undefined; show('edit'); notify('Cannot match this highlight uniquely. Select a smaller passage in the native message.', true); return; }
-      if (automatic) { if (tab === 'edit') render(); paintTarget(); paintStatus(); return; }
-      show('edit'); paintTarget();
+      if (highlighted && !range) { target = undefined; show(destination); notify('Cannot match this highlight uniquely. Select a smaller passage in the native message.', true); return; }
+      if (automatic) { if (['edit', 'swipes'].includes(tab)) render(); paintTarget(); paintStatus(); return; }
+      show(destination); paintTarget();
       body.querySelector<HTMLButtonElement>('.pick-message')?.focus();
       notify(range ? 'Only the highlighted native text will change.' : 'Message selected. Edits apply immediately; Undo stays available.');
     } catch (err) { if (origin === binding && sequence === selectionRequest && !destroyed) notify((err as Error).message, true); }
   }
   function markTarget() {
     marked?.removeAttribute('data-kazzware-target'); marked = null;
-    if (opened && !picking && target && ctx.dom.findMessageElement) {
+    if (opened && ['edit', 'swipes', 'timeline'].includes(tab) && !picking && target && ctx.dom.findMessageElement) {
       marked = ctx.dom.findMessageElement(target.id); marked?.setAttribute('data-kazzware-target', '');
     }
   }
@@ -177,7 +182,7 @@ export function setup(ctx: SpindleFrontendContext): () => void {
     followTimer = setTimeout(() => {
       if (!opened || !following || busy || picking || destroyed) return;
       const id = messageInView(ctx.dom); markTarget();
-      if (!id) { invalidateSelection(); target = undefined; range = undefined; if (tab === 'edit') render(); paintTarget(); return; }
+      if (!id) { invalidateSelection(); target = undefined; range = undefined; if (['edit', 'swipes'].includes(tab)) render(); paintTarget(); return; }
       // Scrolling back to the already-loaded target must also cancel a slower
       // request for the message we just scrolled past.
       if (autoPending && autoPending !== id) invalidateSelection();
@@ -238,7 +243,7 @@ export function setup(ctx: SpindleFrontendContext): () => void {
   });
   function syncGallery() { inline.sync(view?.state.pages || [], !!view?.state.settings.galleryEnabled && !!chatId); }
   disposers.push(() => inline.clear());
-  const chatter = commentary(ctx, mascot.root, { enabled: () => !!view?.state.settings.commentaryEnabled && !!chatId, chatId: () => chatId, visible: () => !!chatId && !opened, rpc, error: text => notify(text, true) });
+  const chatter = commentary(ctx, mascot.root, { settings: () => view?.state.settings, enabled: () => !!view?.state.settings.commentaryEnabled && !!chatId, chatId: () => chatId, visible: () => !!chatId && !opened, rpc, error: text => notify(text, true) });
   disposers.push(() => chatter.destroy());
   const prompt = selectionPrompt(ctx.dom, {
     available: () => !!chatId && !!view && !busy && !destroyed && !picking,
@@ -254,13 +259,11 @@ export function setup(ctx: SpindleFrontendContext): () => void {
     undo: id => run('undo', { undoId: id }, 'Undone. Original wording restored.'),
   });
   disposers.push(() => prompt.destroy());
-  const resize = () => {
-    // A mobile fullscreen placement cannot be dragged. Keep the same 0.8x
-    // floating surface on every screen and clamp it without resetting its position.
+  const resize = (event?: Event) => {
     panel.setFullscreen(false);
-    const width = Math.min(416, (window.innerWidth - 16) * .8);
-    const height = Math.max(160, Math.min(688, ((window.visualViewport?.height || window.innerHeight) - 24) * .8));
-    panelWidth = width; panelHeight = height; panel.setSize(width, height);
+    const width = Math.min(400, window.innerWidth - 16);
+    const height = Math.max(160, Math.min(tab === 'home' ? (view?.state.settings.connectionId ? 452 : 500) : 640, (window.visualViewport?.height || window.innerHeight) - 24));
+    panelWidth = width; panelHeight = height; panel.setSize(width, height); launcher.sync(!!event);
     const pos = panel.getPosition();
     panel.moveTo(Math.max(8, Math.min(pos.x, window.innerWidth - width - 8)), Math.max(8, Math.min(pos.y, (window.visualViewport?.height || window.innerHeight) - height - 8)));
     scheduleFollow();
@@ -274,7 +277,7 @@ export function setup(ctx: SpindleFrontendContext): () => void {
     prompt.reset(); chatter.reset(); inline.clear(); petDrag.cancel(); panelDrag.cancel();
     for (const item of pending.values()) { clearTimeout(item.timer); item.reject(new Error('Chat changed.')); } pending.clear();
     stopPicking(); following = true; invalidateSelection(); clearTimeout(followTimer);
-    binding = randomId(); chatId = next; view = undefined; target = undefined; range = undefined; direction = ''; askDraft = ''; slopDraft = undefined; settingsDraft = undefined; pageId = ''; timelineShown = 30; busy = 0;
+    binding = randomId(); chatId = next; view = undefined; target = undefined; range = undefined; direction = ''; askDraft = ''; slopDraft = undefined; settingsDraft = undefined; pageId = ''; timelineShown = 30; commentaryDraft = {}; namingDraft = {}; busy = 0;
     frame?.destroy(); frame = undefined; mascot.setVisible(!!chatId); panel.setVisible(!!chatId && opened); inputAction.setEnabled(!!chatId);
     render();
     if (chatId) void run('bind', {}, 'Kazz is here. Pick a message or ask a favor.'); else { void rpc('bind').catch(() => {}); notify('Open a chat to wake Kazz.'); }
@@ -295,8 +298,9 @@ export function setup(ctx: SpindleFrontendContext): () => void {
   disposers.push(ctx.events.on('GENERATION_ENDED', payload => { const event = payload as { chatId?: string; messageId?: string; generationType?: string; error?: unknown }; if (event.chatId === chatId && event.messageId && !event.error && ['normal', 'continue', 'regenerate', 'swipe', 'impersonate'].includes(event.generationType || 'normal')) autoStory(event.messageId, event.generationType === 'normal' || event.generationType === 'impersonate'); }));
   for (const eventName of ['MESSAGE_SWIPED', 'SWIPE_EDITED', 'MESSAGE_EDITED'] as const) disposers.push(ctx.events.on(eventName, payload => { const event = payload as { chatId?: string; message?: Message }; if (event.chatId === chatId && event.message?.content.trim()) autoStory(event.message.id, false); }));
   function button(selector: string, handler: () => void) { body.querySelector(selector)?.addEventListener('click', handler); }
-  function heading(code: string, title: string, tag: string) { return `<div class="section-head"><div class="eyebrow">${code}</div><h2>${title}</h2><span class="badge">${tag}</span></div>`; }
+  function heading(code: string, title: string, tag: string) { return `<div class="section-head"><h2>${title}</h2></div>`; }
   function render() {
+    resize();
     for (const drag of artDrags) drag.destroy(); artDrags = [];
     syncGallery(); chatter.sync();
     frame?.destroy(); frame = undefined;
@@ -305,7 +309,7 @@ export function setup(ctx: SpindleFrontendContext): () => void {
     root.querySelector('.chat-name')!.textContent = view?.chatName || 'Current chat';
     nav.querySelectorAll('button').forEach(b => { b.classList.toggle('active', b.dataset.tab === tab); b.setAttribute('aria-current', b.dataset.tab === tab ? 'page' : 'false'); });
     if (!view) { body.innerHTML = '<p class="empty">Connecting to this chat…</p>'; paintStatus(); return; }
-    mascot.setSize(view.state.settings.mascotSize, view.state.settings.mascotSize);
+    launcher.sync();
     if (tab === 'home') renderHome();
     if (tab === 'edit') renderEditor();
     if (tab === 'slop') renderSlop();
@@ -313,20 +317,22 @@ export function setup(ctx: SpindleFrontendContext): () => void {
     if (tab === 'gallery') renderGallery();
     if (tab === 'notebook') renderNotebook();
     if (tab === 'settings') renderSettings();
+    if (tab === 'commentary') renderFeatureControls(body, storyUI, tab, commentaryDraft, draft => { commentaryDraft = draft; });
+    if (tab === 'naming') renderFeatureControls(body, storyUI, tab, namingDraft, draft => { namingDraft = draft; });
+    if (tab === 'swipes') { body.innerHTML = heading('', 'Swipe merger', '') + targetControls(); wireTargetControls(); mountMerger(body, storyUI); body.querySelector('details')!.open = true; }
     if (tab === 'timeline') { renderTimeline(body, storyUI, timelineShown, () => { timelineShown += 30; render(); }); body.insertAdjacentHTML('afterbegin', targetControls()); wireTargetControls(); }
     if (!['home', 'chat'].includes(tab)) { const sheet = document.createElement('div'); sheet.className = 'workbench'; sheet.append(...Array.from(body.childNodes)); body.append(sheet); }
     body.querySelectorAll<HTMLImageElement>('.orbit-kazz,.chat-perch img,.off-duty').forEach(art => { art.draggable = false; art.style.pointerEvents = 'auto'; art.style.cursor = 'grab'; artDrags.push(draggable(art, panel)); });
     paintTarget(); paintStatus();
   }
   function renderHome() {
-    body.innerHTML = `<div class="orbit"><div class="speech">Need me to fuck<br>some shit up?<span>YOUR FRIENDLY NEIGHBORHOOD MALWARE</span></div><img draggable="false" class="orbit-kazz" src="${perched}" alt="Kazz perched on his mechanical tail"><span class="orbit-stamp" aria-hidden="true">100%<br>YOUR PROBLEM</span><button class="shard shard-edit" data-go="edit"><small>01 / MESSAGE SURGERY</small><strong>Cut the crap.</strong><span>Rewrite + Undo ↗</span></button><button class="shard shard-slop" data-go="slop"><small>02 / EVICTION LIST</small><strong>No more slop.</strong><span>Ban the usual suspects ↗</span></button><button class="shard shard-chat" data-go="chat"><small>03 / DIRECT LINE</small><strong>Psst. Kazz.</strong><span>Ask your accomplice ↗</span></button><button class="shard shard-gallery" data-go="gallery"><small>04 / PEANUT GALLERY</small><strong>Start shit.</strong><span>Wake the fandom ↗</span></button><button class="shard shard-notebook" data-go="notebook"><small>05 / THE RECEIPTS</small><strong>Evidence locker.</strong><span>Summaries + lore ↗</span></button></div><form class="quick-ask"><label for="home-ask">GOT A PROBLEM?</label><div><input id="home-ask" class="home-ask" placeholder="Spit it out…" value="${e(askDraft)}" maxlength="20000"><button class="primary" aria-label="Send to Kazz" data-mutate>↗</button></div></form><div class="home-target">${targetControls()}</div>${!view!.state.settings.connectionId ? '<button class="plug" data-go="settings">Plug me in ↗ Choose a connection</button>' : ''}`;
+    const features: [Tab, string][] = [['edit', 'Editor'], ['swipes', 'Swipes'], ['slop', 'De-slop'], ['chat', 'Chat'], ['gallery', 'Gallery'], ['timeline', 'Summary+'], ['notebook', 'Notebook'], ['naming', 'Chat names'], ['commentary', 'Commentary']];
+    const s = view!.state.settings;
+    body.innerHTML = `<div class="orbit"><div class="orbit-ring" aria-hidden="true"></div><img draggable="false" class="orbit-kazz" src="${perched}" alt="Kazz perched on his mechanical tail">${features.map(([key, label]) => `<button class="shard shard-${key}" data-go="${key}">${icon(key)}<span>${label}</span>${['commentary', 'naming', 'gallery'].includes(key) ? `<i class="feature-light ${s[key === 'commentary' ? 'commentaryEnabled' : key === 'naming' ? 'autoName' : 'galleryEnabled'] ? 'on' : ''}" aria-label="${s[key === 'commentary' ? 'commentaryEnabled' : key === 'naming' ? 'autoName' : 'galleryEnabled'] ? 'On' : 'Off'}"></i>` : ''}</button>`).join('')}</div>${!s.connectionId ? '<button class="plug" data-go="settings">Choose a connection ↗</button>' : ''}`;
     body.querySelectorAll<HTMLButtonElement>('[data-go]').forEach(b => b.addEventListener('click', () => show(b.dataset.go as Tab)));
-    body.querySelector('.home-ask')!.addEventListener('input', ev => { askDraft = (ev.target as HTMLInputElement).value; });
-    body.querySelector('form')!.addEventListener('submit', ev => { ev.preventDefault(); if (busy || !askDraft.trim()) return; const text = askDraft; askDraft = ''; show('chat'); void run('ask', { text }, 'Kazz has replied.'); });
-    wireTargetControls();
   }
   function renderEditor() {
-    body.innerHTML = `${heading('01 / EDITOR', 'Message surgery', 'CUT + STITCH')}${targetControls()}<p class="muted">Select text directly in the chat for a precise edit. Writing a direction pins the target.</p>${target ? `<div class="range" role="status">${range ? `Native highlight · ${range.end - range.start} characters only` : 'Whole message selected'}</div>${range ? '<button class="clear-range">Use whole message instead</button>' : ''}<label class="field">Your direction<textarea class="direction" placeholder="Shorten this. Keep the tension, lose the three-paragraph weather report.">${e(direction)}</textarea></label><div class="row"><button class="primary apply" data-mutate>Edit now</button><button class="deslop" data-mutate>De-slop now</button></div><small>Same narrative moment unless you explicitly ask to advance it.</small>` : '<div class="empty">Pick a native message or highlight a passage in the chat.</div>'}<h3 style="margin-top:26px">Undo history · latest 20 edits</h3>${[...view!.state.undo].reverse().map(u => `<div class="history"><strong>${e(u.label)}</strong><p>${new Date(u.createdAt).toLocaleString()} · ${u.status === 'prepared' ? 'Recovery record — check current message' : u.status}</p><button data-undo="${e(u.id)}" data-mutate ${u.status === 'undone' ? 'hidden' : ''}>Undo this edit</button></div>`).join('') || '<p class="empty">No Kazz edits in this chat yet.</p>'}`;
+    body.innerHTML = `${heading('01 / EDITOR', 'Editor', 'CUT + STITCH')}${targetControls()}<p class="muted">Select text directly in the chat for a precise edit. Writing a direction pins the target.</p>${target ? `<div class="range" role="status">${range ? `Native highlight · ${range.end - range.start} characters only` : 'Whole message selected'}</div>${range ? '<button class="clear-range">Use whole message instead</button>' : ''}<label class="field">Your direction<textarea class="direction" placeholder="Shorten this. Keep the tension, lose the three-paragraph weather report.">${e(direction)}</textarea></label><div class="row"><button class="primary apply" data-mutate>Edit now</button><button class="deslop" data-mutate>De-slop now</button></div><small>Same narrative moment unless you explicitly ask to advance it.</small>` : '<div class="empty">Pick a native message or highlight a passage in the chat.</div>'}<h3 style="margin-top:26px">Undo history · latest 20 edits</h3>${[...view!.state.undo].reverse().map(u => `<div class="history"><strong>${e(u.label)}</strong><p>${new Date(u.createdAt).toLocaleString()} · ${u.status === 'prepared' ? 'Recovery record — check current message' : u.status}</p><button data-undo="${e(u.id)}" data-mutate ${u.status === 'undone' ? 'hidden' : ''}>Undo this edit</button></div>`).join('') || '<p class="empty">No Kazz edits in this chat yet.</p>'}`;
     wireTargetControls();
     if (target) {
       body.querySelector<HTMLTextAreaElement>('.direction')!.addEventListener('focus', pinTarget);
@@ -339,7 +345,7 @@ export function setup(ctx: SpindleFrontendContext): () => void {
     body.querySelectorAll<HTMLButtonElement>('[data-undo]').forEach(b => b.addEventListener('click', () => { void run('undo', { undoId: b.dataset.undo }, 'Undone. Previous wording restored.'); }));
   }
   function renderSlop() {
-    body.innerHTML = `${heading('02 / DE-SLOP', 'Eviction list', 'KILL ON SIGHT')}<p class="muted">One phrase or word per line. Literal matching; case-insensitive.</p><label class="field">Banned phrases<textarea class="phrases" style="min-height:240px" maxlength="60300">${e(slopDraft ?? view!.state.settings.slop.join('\n'))}</textarea></label><label class="check"><input class="whole" type="checkbox" ${view!.state.settings.wholeWords ? 'checked' : ''}>Match whole words / phrase boundaries</label><div class="row"><button class="primary save-slop" data-mutate>Save list</button><button class="scan">Scan selected message</button></div><div class="hits field"></div><div class="note">De-slop rewrites coherently, then scans the result again. If banned wording remains, the original stays intact.</div>`;
+    body.innerHTML = `${heading('02 / DE-SLOP', 'De-slop', 'KILL ON SIGHT')}<p class="muted">One phrase or word per line. Literal matching; case-insensitive.</p><label class="field">Banned phrases<textarea class="phrases" style="min-height:240px" maxlength="60300">${e(slopDraft ?? view!.state.settings.slop.join('\n'))}</textarea></label><label class="check"><input class="whole" type="checkbox" ${view!.state.settings.wholeWords ? 'checked' : ''}>Match whole words / phrase boundaries</label><div class="row"><button class="primary save-slop" data-mutate>Save list</button><button class="scan">Scan selected message</button></div><div class="hits field"></div><div class="note">De-slop rewrites coherently, then scans the result again. If banned wording remains, the original stays intact.</div>`;
     body.querySelector('.phrases')!.addEventListener('input', ev => { slopDraft = (ev.target as HTMLTextAreaElement).value; });
     const phrases = () => body.querySelector<HTMLTextAreaElement>('.phrases')!.value.split(/\r?\n/).map(p => p.trim()).filter(Boolean);
     button('.save-slop', () => { const next = { ...view!.state.settings, slop: phrases(), wholeWords: body.querySelector<HTMLInputElement>('.whole')!.checked }; slopDraft = undefined; void run('settings', { settings: next }, 'Eviction list saved for this chat.'); });
@@ -371,7 +377,7 @@ export function setup(ctx: SpindleFrontendContext): () => void {
     }
   }
   function renderNotebook() {
-    body.innerHTML = `${heading('05 / NOTEBOOK', 'The evidence locker', 'KEEP THE RECEIPTS')}<p class="muted">Summaries cover the entire current chat. Lorebooks are created in Lumiverse and attached to this chat.</p><div class="row field"><button class="primary summarize" data-mutate>Summarize chat</button><button class="lorebook" data-mutate>Create lorebook</button></div><small>Long chats require several model calls. Stop cancels unfinished work.</small>${[...view!.state.summaries].reverse().map(s => `<details class="history"><summary>${s.messages} messages · ${new Date(s.createdAt).toLocaleString()}</summary><div class="summary">${e(s.text)}</div></details>`).join('') || '<div class="empty">No summaries yet.</div>'}<h3 style="margin-top:20px">Created lorebooks</h3>${view!.state.lorebooks.map(b => `<div class="history"><strong>${e(b.name)}</strong><p>ID: ${e(b.id)}</p><small>Manage entries and attachment in Lumiverse’s lorebook editor. Interrupted creations may be incomplete.</small></div>`).join('') || '<p class="empty">No lorebooks created by Kazz yet.</p>'}`;
+    body.innerHTML = `${heading('05 / NOTEBOOK', 'Notebook', 'KEEP THE RECEIPTS')}<p class="muted">Summaries cover the entire current chat. Lorebooks are created in Lumiverse and attached to this chat.</p><div class="row field"><button class="primary summarize" data-mutate>Summarize chat</button><button class="lorebook" data-mutate>Create lorebook</button></div><small>Long chats require several model calls. Stop cancels unfinished work.</small>${[...view!.state.summaries].reverse().map(s => `<details class="history"><summary>${s.messages} messages · ${new Date(s.createdAt).toLocaleString()}</summary><div class="summary">${e(s.text)}</div></details>`).join('') || '<div class="empty">No summaries yet.</div>'}<h3 style="margin-top:20px">Created lorebooks</h3>${view!.state.lorebooks.map(b => `<div class="history"><strong>${e(b.name)}</strong><p>ID: ${e(b.id)}</p><small>Manage entries and attachment in Lumiverse’s lorebook editor. Interrupted creations may be incomplete.</small></div>`).join('') || '<p class="empty">No lorebooks created by Kazz yet.</p>'}`;
     button('.summarize', () => { void run('summary', {}, 'Full-chat summary saved in the notebook.'); }); button('.lorebook', () => { void run('lorebook', {}, 'Lorebook created and attached to this chat.'); });
     const summaries = [...view!.state.summaries].reverse();
     body.querySelectorAll<HTMLDetailsElement>('details').forEach((details, index) => {
@@ -384,13 +390,10 @@ export function setup(ctx: SpindleFrontendContext): () => void {
   }
   function renderSettings() {
     const s = settingsDraft || view!.state.settings;
-    body.innerHTML = `${heading('06 / SETTINGS', 'Under the hood', 'HANDLE WITH CARE')}<p class="muted">Saved separately for each chat.</p><label class="field">Kazz’s connection<select class="connection"><option value="">Choose a connection…</option>${view!.connections.map(c => `<option value="${e(c.id)}" ${c.id === s.connectionId ? 'selected' : ''}>${e(c.name)} · ${e(c.model)}</option>`).join('')}</select></label><small>Uses this saved connection for every Kazz request. Your roleplay connection stays as it is.</small><label class="check"><input class="commentary-enabled" type="checkbox" ${s.commentaryEnabled ? 'checked' : ''}>Let Kazz comment from his widget</label><small>One short aside per new message or unseen swipe, using this connection. Off by default; never adds to the chat. Bubbles fade after 14 seconds or can be dismissed.</small><label class="check"><input class="auto-name" type="checkbox" ${s.autoName ? 'checked' : ''}>Automatically name this chat</label><label class="field">Rename every 10–50 new messages<input class="name-interval" type="number" min="10" max="50" value="${s.nameInterval}"></label><small>First title on the next new message; then at this interval. Swipes do not advance the count. Existing titles may be replaced while enabled.</small><button class="name-now" data-mutate>Name chat now</button><label class="field">Recent messages in working context (5–100)<input class="context" type="number" min="5" max="100" value="${s.contextMessages}"></label><label class="field">Gallery interval (normal replies)<input class="interval" type="number" min="1" max="100" value="${s.interval}"></label><label class="field">Gallery format<select class="format">${[['random', 'Surprise me'], ['forum', 'AITA / discussion forum'], ['thread', 'Fandom social thread'], ['wiki', 'Unofficial wiki']].map(([key, label]) => `<option value="${key}" ${key === s.format ? 'selected' : ''}>${label}</option>`).join('')}</select></label><label class="field">Mascot size<input class="size" type="range" min="70" max="180" value="${s.mascotSize}"></label><div class="row"><button class="primary save-settings" data-mutate>Save settings</button><button class="reload-state">Reload</button></div><div class="note">Context goes to the connection you select. Search can inspect older messages; summaries read the whole chat. Kazz never receives connection API keys.</div>`;
-    const read = (): Settings => ({ ...view!.state.settings, autoName: body.querySelector<HTMLInputElement>('.auto-name')!.checked, nameInterval: Number(body.querySelector<HTMLInputElement>('.name-interval')!.value), commentaryEnabled: body.querySelector<HTMLInputElement>('.commentary-enabled')!.checked, connectionId: body.querySelector<HTMLSelectElement>('.connection')!.value, contextMessages: Number(body.querySelector<HTMLInputElement>('.context')!.value), interval: Number(body.querySelector<HTMLInputElement>('.interval')!.value), format: body.querySelector<HTMLSelectElement>('.format')!.value as Settings['format'], mascotSize: Number(body.querySelector<HTMLInputElement>('.size')!.value) });
+    body.innerHTML = `${heading('06 / SETTINGS', 'Settings', 'HANDLE WITH CARE')}<p class="muted">Saved separately for each chat.</p><label class="field">Kazz’s connection<select class="connection"><option value="">Choose a connection…</option>${view!.connections.map(c => `<option value="${e(c.id)}" ${c.id === s.connectionId ? 'selected' : ''}>${e(c.name)} · ${e(c.model)}</option>`).join('')}</select></label><small>Uses this saved connection for every Kazz request. Your roleplay connection stays as it is.</small><label class="field">Recent messages in working context (5–100)<input class="context" type="number" min="5" max="100" value="${s.contextMessages}"></label><label class="field">Gallery interval (normal replies)<input class="interval" type="number" min="1" max="100" value="${s.interval}"></label><label class="field">Gallery format<select class="format">${[['random', 'Surprise me'], ['forum', 'AITA / discussion forum'], ['thread', 'Fandom social thread'], ['wiki', 'Unofficial wiki']].map(([key, label]) => `<option value="${key}" ${key === s.format ? 'selected' : ''}>${label}</option>`).join('')}</select></label><label class="field">Mascot size<input class="size" type="range" min="70" max="180" value="${s.mascotSize}"></label><label class="check"><span>Use the mobile peeker</span><input class="mobile-peek" type="checkbox" role="switch" ${s.mobilePeek ? 'checked' : ''}></label><div class="row"><button class="primary save-settings" data-mutate>Save settings</button><button class="reload-state">Reload</button></div><div class="note">Context goes to the connection you select. Search can inspect older messages; summaries read the whole chat. Kazz never receives connection API keys.</div>`;
+    const read = (): Settings => ({ ...view!.state.settings, mobilePeek: body.querySelector<HTMLInputElement>('.mobile-peek')!.checked, connectionId: body.querySelector<HTMLSelectElement>('.connection')!.value, contextMessages: Number(body.querySelector<HTMLInputElement>('.context')!.value), interval: Number(body.querySelector<HTMLInputElement>('.interval')!.value), format: body.querySelector<HTMLSelectElement>('.format')!.value as Settings['format'], mascotSize: Number(body.querySelector<HTMLInputElement>('.size')!.value) });
     body.querySelectorAll('input,select').forEach(input => input.addEventListener('input', () => { settingsDraft = read(); }));
     button('.save-settings', () => { const next = read(); settingsDraft = undefined; void run('settings', { settings: next }, 'Settings saved for this chat.'); });
-    button('.name-now', () => { void run('nameChat', {}, 'Chat renamed. Title Undo is below.'); });
-    const nameHistory = document.createElement('div'); nameHistory.className = 'name-history'; nameHistory.innerHTML = [...view!.state.story.names].reverse().filter(n => n.status !== 'undone').map(n => `<button data-name-undo="${e(n.id)}" data-mutate>Undo title: ${e(n.after)}</button>`).join('');
-    nameHistory.querySelectorAll<HTMLButtonElement>('button').forEach(b => b.addEventListener('click', () => { void run('undoName', { id: b.dataset.nameUndo }, 'Previous chat title restored.'); })); body.append(nameHistory);
     button('.reload-state', () => { settingsDraft = undefined; void run('load', {}, 'Reloaded.'); });
   }
   panel.setVisible(false); mascot.setVisible(false); resize(); changeChat(stateAPI.get('chat.active')); ctx.ready();

@@ -137,6 +137,20 @@ test('commentary rejects stale swipes and discards results when a newer message 
   expect((await f.request('commentary', data)).result).toBeNull(); expect(f.modelInputs).toHaveLength(1);
 });
 
+test('commentary frequency counts unique messages/swipes once, skips provider calls, and resets on preference changes', async () => {
+  const f = fake(); await f.ready();
+  await f.request('settings', { settings: { ...f.state().settings, commentaryEnabled: true, commentaryInterval: 3 } });
+  const message = f.messages.get('chat-a')![0];
+  const tick = () => f.request('commentary', { messageId: message.id, expected: message.content, swipe: message.swipe_id });
+  expect((await tick()).result).toBeNull(); await tick(); expect(f.state().commentaryCount).toBe(1);
+  message.swipe_id++; message.content = 'Another possibility.'; expect((await tick()).result).toBeNull(); expect(f.modelInputs).toHaveLength(0);
+  message.swipe_id++; message.content = 'Third possibility.'; f.outputs.push('Three terrible options. Impressive.'); expect((await tick()).result).toContain('Three'); expect(f.state().commentaryCount).toBe(0);
+  await tick(); expect(f.modelInputs).toHaveLength(1);
+  message.content = 'Changed again.'; await tick(); expect(f.state().commentaryCount).toBe(1);
+  await f.request('settings', { settings: { ...f.state().settings, commentaryInterval: 2 } }); expect(f.state().commentaryCount).toBe(0);
+  expect(f.updates).toHaveLength(0);
+});
+
 test('failed commentary events are consumed once and chat changes cancel pending commentary', async () => {
   const f = fake(); await f.ready(); f.state().settings.commentaryEnabled = true;
   const message = f.messages.get('chat-a')![0], data = { messageId: 'm1', expected: message.content, swipe: 0 };

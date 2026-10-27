@@ -13,6 +13,8 @@ test('range editing preserves exact source bytes outside UTF-16 offsets', () => 
 test('settings enforce bounded lists, intervals, and format', () => {
   expect(() => settings({ ...DEFAULTS, interval: 0 })).toThrow(); expect(() => settings({ ...DEFAULTS, slop: [''] })).toThrow();
   expect(settings({ ...DEFAULTS, slop: ['a', 'a'] }).slop).toEqual(['a']);
+  for (const [key, value] of [['commentaryDuration', 1], ['commentaryWidth', 401], ['commentaryInterval', 0], ['commentaryInterval', 51], ['mobilePeek', 'yes']]) expect(() => settings({ ...DEFAULTS, [key]: value })).toThrow();
+  expect(settings({ ...DEFAULTS, commentaryDuration: 0 }).commentaryDuration).toBe(0);
 });
 test('textarea normalized newlines map back to original source offsets', () => {
   const source = '🌑\r\nfirst\rsecond\r\nlast';
