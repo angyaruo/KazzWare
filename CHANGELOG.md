@@ -1,5 +1,16 @@
 # Changelog
 
+
+## 0.4.0 · 2026-10-27
+
+- Scale the open companion composition to 80%. Keep it floating on phones instead of forcing fullscreen.
+- Own mouse/touch dragging with pointer capture, a movement threshold and click suppression. Disable native mascot-image dragging; support the title and large artwork as menu drag handles, plus arrow-key movement.
+- Remove the source-text textarea and recent-message dropdown. Highlight native chat prose to open a compact direction prompt with immediate selection-only editing, Undo, More options and Close.
+- Preserve exact source/swipe snapshots across focus changes. Literal unique highlights and browser whitespace normalization are supported; ambiguous or formatting-altered highlights fail closed. Chat changes, dismissal and late replies cannot restore a stale prompt.
+- Add collapsible Peanut Gallery entries beneath their triggering native messages through Spindle's replayable injection API. Likes/comments stay in the existing sandbox and storage; pausing hides entries without deleting saved pages.
+- Pin the automatic Gallery context and attachment to the triggering reply before generation, including when newer replies arrive mid-call. Manual Fresh drama anchors to the latest message at generation start.
+- Keep existing permissions and storage format. Rebuild both tracked bundles; update the sample preview and regression coverage.
+
 ## 0.3.0 — 2026-10-26
 
 Replace the outer window with a transparent companion composition based on the owner’s sketches: Kazz in the center, a speech bubble, separate crooked action tiles, and a quick input strip. Chat puts the leaning pose above the input and floating dialogue strips. Add the four new unmodified PNGs; use the curled pose for the launcher and hide the duplicate launcher while the menu is open. Scope click-through styling to this panel’s host wrappers.

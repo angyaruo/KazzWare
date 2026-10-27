@@ -110,15 +110,19 @@ export class KazzService {
     if (!complete || !response.trim()) throw new Error('The connection returned an incomplete or empty response.');
     return response;
   }
-  private async context(job: Job) {
+  private async context(job: Job, throughMessage?: string) {
     const chat = await this.api.chats.get(job.request.chatId!, job.user);
-    const [messages, card, persona, lore] = await Promise.all([
+    const [allMessages, card, persona, lore] = await Promise.all([
       this.messages(job),
       chat?.character_id ? this.api.characters.get(chat.character_id, job.user).catch(() => null) : null,
       typeof chat?.metadata.persona_id === 'string' ? this.api.personas.get(chat.metadata.persona_id, job.user).catch(() => null) : this.api.personas.getActive(job.user).catch(() => null),
       this.api.world_books.getActivated(job.request.chatId!, job.user).catch(() => []),
     ]);
-    return { chat: { id: chat?.id, name: chat?.name }, card: clip(card, 16_000), persona: clip(persona, 6000), activatedLore: clip(lore, 12_000), messages: messages.slice(-job.state.settings.contextMessages).map(m => ({ id: m.id, name: m.name, content: m.content.slice(0, 5000) })), totalMessages: messages.length, summary: job.state.summaries.at(-1)?.text || '' };
+    const end = throughMessage ? allMessages.findIndex(m => m.id === throughMessage) : allMessages.length - 1;
+    if (throughMessage && end < 0) throw new Error('The triggering message no longer exists.');
+    const messages = allMessages.slice(0, end + 1);
+    const summary = [...job.state.summaries].reverse().find(s => messages.some(m => m.id === s.throughMessage));
+    return { chat: { id: chat?.id, name: chat?.name }, card: clip(card, 16_000), persona: clip(persona, 6000), activatedLore: clip(lore, 12_000), messages: messages.slice(-job.state.settings.contextMessages).map(m => ({ id: m.id, name: m.name, content: m.content.slice(0, 5000) })), totalMessages: messages.length, summary: summary?.text || '' };
   }
   private async dispatch(job: Job): Promise<unknown> {
     const data = job.request.data!;
@@ -149,7 +153,7 @@ export class KazzService {
         const due = job.state.count >= job.state.settings.interval;
         if (due) job.state.count = 0;
         await this.save(job);
-        if (due) await this.gallery(job);
+        if (due) await this.gallery(job, message.id);
         return this.view(job);
       }
       case 'react': {
@@ -251,13 +255,16 @@ export class KazzService {
     await this.api.chats.update(chat.id, { metadata: { ...chat.metadata, chat_world_book_ids: [...new Set([...existing, book.id])] } }, job.user);
     return { id: book.id, name, entries: entries.length, attachedToCurrentChat: true };
   }
-  private async gallery(job: Job) {
+  private async gallery(job: Job, triggerId?: string) {
     this.progress(job, 'The fandom is having opinions…');
     const formats = ['forum', 'thread', 'wiki'] as const;
     const format = job.state.settings.format === 'random' ? formats[Math.floor(Math.random() * formats.length)] : job.state.settings.format;
-    const result = parseJSON(await this.model(job, `Write a fictional fandom page about this roleplay. Format: ${format}. Forum: an AITA-style post in a character's voice and commenters arguing. Thread: fake fandom accounts, ships, funny beef, different opinions. Wiki: fan-written article sections and disputed trivia. Stay grounded in the supplied events. Do not progress the roleplay or pretend this is a real external website. Return JSON {"title":"...","posts":[{"author":"...","title":"...","body":"..."}]}, 3–8 posts/sections. Body is plain text.`, { context: await this.context(job), previousPage: job.state.pages.at(-1) }, 6000));
+    // Pin both the context cutoff and attachment before the asynchronous model call.
+    const context = await this.context(job, triggerId);
+    const throughMessage = triggerId || context.messages.at(-1)?.id || '';
+    const result = parseJSON(await this.model(job, `Write a fictional fandom page about this roleplay. Format: ${format}. Forum: an AITA-style post in a character's voice and commenters arguing. Thread: fake fandom accounts, ships, funny beef, different opinions. Wiki: fan-written article sections and disputed trivia. Stay grounded in the supplied events. Do not progress the roleplay or pretend this is a real external website. Return JSON {"title":"...","posts":[{"author":"...","title":"...","body":"..."}]}, 3–8 posts/sections. Body is plain text.`, { context }, 6000));
     if (!Array.isArray(result.posts) || result.posts.length < 1 || result.posts.length > 12) throw new Error('Invalid fandom page.');
-    const page: GalleryPage = { id: crypto.randomUUID(), title: string(result.title, 'Page title', 180), format, createdAt: Date.now(), throughMessage: (await this.messages(job)).at(-1)?.id || '', votes: [], comments: [], posts: result.posts.map(raw => { const v = object(raw); return { id: crypto.randomUUID(), author: string(v.author, 'Author', 100), title: typeof v.title === 'string' ? v.title.slice(0, 200) : '', body: string(v.body, 'Post', 8000) }; }) };
+    const page: GalleryPage = { id: crypto.randomUUID(), title: string(result.title, 'Page title', 180), format, createdAt: Date.now(), throughMessage, votes: [], comments: [], posts: result.posts.map(raw => { const v = object(raw); return { id: crypto.randomUUID(), author: string(v.author, 'Author', 100), title: typeof v.title === 'string' ? v.title.slice(0, 200) : '', body: string(v.body, 'Post', 8000) }; }) };
     this.live(job); job.state.pages = [...job.state.pages.slice(-29), page]; await this.save(job);
   }
   private async ask(job: Job, text: string) {
