@@ -97,3 +97,15 @@ describe('notebook, assistant, fandom', () => {
     expect((await f.request('gallery')).result).toBeNull(); expect(f.modelInputs).toHaveLength(0);
   });
 });
+
+
+test('automatic fandom anchors and context stop at the triggering message even if more replies arrive', async () => {
+  const f = fake(); await f.ready(); await f.request('settings', { settings: { ...f.state().settings, galleryEnabled: true, interval: 1 } });
+  f.messages.get('chat-a')!.push({ ...f.messages.get('chat-a')![0], id: 'future', content: 'FUTURE SPOILER', index_in_chat: 1 });
+  const gate = deferred(); f.setGate(() => gate.promise);
+  f.outputs.push('{"title":"Old drama","posts":[{"author":"fan","title":"Wait","body":"The key."}]}');
+  const work = f.request('tick', { generationType: 'normal', messageId: 'm1' }); await until(() => f.modelInputs.length === 1);
+  f.messages.get('chat-a')!.push({ ...f.messages.get('chat-a')![0], id: 'newest', index_in_chat: 2 }); gate.resolve();
+  expect((await work).ok).toBe(true); expect(f.state().pages[0].throughMessage).toBe('m1');
+  expect(JSON.stringify(f.modelInputs[0])).not.toContain('FUTURE SPOILER');
+});

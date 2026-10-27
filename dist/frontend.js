@@ -25,24 +25,6 @@ function uniqueRange(source, selected) {
     return;
   return { start, end: start + selected.length };
 }
-function textareaRange(source, start, end) {
-  const offset = (position) => {
-    let displayed = 0, original = 0;
-    while (original < source.length && displayed < position) {
-      if (source[original] === "\r" && source[original + 1] === `
-`)
-        original++;
-      original++;
-      displayed++;
-    }
-    return original;
-  };
-  return { start: offset(start), end: offset(end) };
-}
-function textareaOffset(source, offset) {
-  return source.slice(0, offset).replace(/\r\n?/g, `
-`).length;
-}
 function slopHits(text, phrases, wholeWords) {
   return phrases.map((phrase) => {
     const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -78,22 +60,23 @@ function submitComment(form){var input=form.querySelector('textarea');if(!input.
 
 // src/style.ts
 var CSS = `
-:host{--ink:#0c0e12;--paper:#eeeede;--ice:#bce9f3;--red:#ff4b57;--acid:#d8ef89;--display:KazzDisplay,Impact,'Arial Narrow',sans-serif;--mono:ui-monospace,Consolas,monospace;display:block;height:100%;font:14px/1.5 system-ui,-apple-system,'Segoe UI',sans-serif;color:var(--paper);color-scheme:dark;container:kazz / inline-size}
+:host{--ink:#0c0e12;--paper:#eeeede;--ice:#bce9f3;--red:#ff4b57;--acid:#d8ef89;--display:KazzDisplay,Impact,'Arial Narrow',sans-serif;--mono:ui-monospace,Consolas,monospace;display:block;height:100%;font:14px/1.5 system-ui,-apple-system,'Segoe UI',sans-serif;color:var(--paper);color-scheme:dark;}
 *{box-sizing:border-box}button,input,textarea,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.45;cursor:wait}[hidden]{display:none!important}button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid var(--ice);outline-offset:3px}::selection{background:var(--ice);color:var(--ink)}
 button,select,input,textarea{border:1px solid #677079;color:var(--paper);background:#14181d;border-radius:3px}button{min-height:44px;padding:9px 13px;font-weight:650;transition:background .12s,box-shadow .12s}button:hover:enabled{background:#30383d;border-color:var(--ice)}button:active:enabled{box-shadow:none}.primary{background:var(--red);color:var(--ink);border:2px solid var(--ink);box-shadow:3px 3px 0 var(--paper);font-weight:850}.primary:hover:enabled{background:#ff7b7d;color:var(--ink);border-color:var(--ink)}
 .muted,small{color:#b4bac0}small{font-size:11px;line-height:1.6}h1,h2,h3,p{margin:0}h2{font:900 36px/.95 var(--display);text-transform:uppercase;letter-spacing:-.4px}h3{font:900 21px/1.1 var(--display);text-transform:uppercase}p+p{margin-top:12px}label{display:block;font:11px/1.5 var(--mono);color:#d7dcde}input,textarea,select{width:100%;max-width:100%;padding:11px;margin-top:7px;font:14px/1.5 system-ui,sans-serif;min-height:44px;box-shadow:inset 3px 0 0 #414950}textarea{resize:vertical;min-height:105px;line-height:1.65}select{padding-right:26px;text-overflow:ellipsis}input[type=checkbox]{flex-shrink:0;width:20px;min-height:20px;height:20px;accent-color:var(--red);margin:0 10px 0 0;box-shadow:none}input[type=range]{accent-color:var(--ice);box-shadow:none;padding:0}label.check{display:flex;align-items:center;font:13px/1.5 system-ui,sans-serif;margin:16px 0;min-height:44px}.field{margin:20px 0}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.stack{display:flex;flex-direction:column;gap:12px}
 /* Each tool is a window inside Kazz's hacked desktop. */
-.section-head{position:relative;margin:0 2px 19px;padding:10px 13px 12px;background:var(--paper);color:var(--ink);border:2px solid var(--ink);transform:rotate(-1.2deg);box-shadow:4px 4px 0 var(--red)}.section-head .eyebrow{font:700 9px var(--mono);letter-spacing:1px;margin-bottom:6px}.section-head h2{font-size:38px}.section-head .badge{position:absolute;right:5px;top:-10px;transform:rotate(5deg);border:1px solid var(--ink)}.body>.muted{font-size:12px;margin-bottom:16px}.note{position:relative;padding:13px 14px 13px 18px;background:#20282e;border:1px solid #546570;border-left:5px solid var(--ice);font-size:12px;color:#d0dce1;margin:17px 0;box-shadow:3px 3px 0 #000}.raw{font:12px/1.8 var(--mono);min-height:195px;white-space:pre-wrap;background:#0a1116;color:#d2edf4;border-color:#688591;box-shadow:inset 4px 0 0 var(--ice)}.direction,.ask{border-color:#899397}.range{color:var(--acid);font:10px/1.5 var(--mono);min-height:24px;margin-top:6px}.hits{color:#ffc1c6;font:12px/1.7 var(--mono);white-space:pre-wrap}.phrases{background:repeating-linear-gradient(0deg,transparent 0 27px,#ff4b570c 27px 28px),#171215;border-color:#a2656a;box-shadow:inset 4px 0 0 var(--red)}
+.section-head{position:relative;margin:0 2px 19px;padding:10px 13px 12px;background:var(--paper);color:var(--ink);border:2px solid var(--ink);transform:rotate(-1.2deg);box-shadow:4px 4px 0 var(--red)}.section-head .eyebrow{font:700 9px var(--mono);letter-spacing:1px;margin-bottom:6px}.section-head h2{font-size:38px}.section-head .badge{position:absolute;right:5px;top:-10px;transform:rotate(5deg);border:1px solid var(--ink)}.body>.muted{font-size:12px;margin-bottom:16px}.note{position:relative;padding:13px 14px 13px 18px;background:#20282e;border:1px solid #546570;border-left:5px solid var(--ice);font-size:12px;color:#d0dce1;margin:17px 0;box-shadow:3px 3px 0 #000}.direction,.ask{border-color:#899397}.range{color:var(--acid);font:10px/1.5 var(--mono);min-height:24px;margin-top:6px}.hits{color:#ffc1c6;font:12px/1.7 var(--mono);white-space:pre-wrap}.phrases{background:repeating-linear-gradient(0deg,transparent 0 27px,#ff4b570c 27px 28px),#171215;border-color:#a2656a;box-shadow:inset 4px 0 0 var(--red)}
 .bubble{position:relative;white-space:pre-wrap;overflow-wrap:anywhere;background:#202a30;border:1px solid #6e8792;border-radius:1px 10px 1px 1px;padding:14px;font-size:13px;box-shadow:4px 4px 0 #050709;margin-right:12px}.bubble.user{background:var(--paper);color:var(--ink);border-color:var(--ink);margin:0 0 0 23px;box-shadow:4px 4px 0 #5e6d73;border-radius:10px 1px 1px 1px}.speaker{display:table;font:700 9px var(--mono);letter-spacing:1px;color:var(--ink);background:var(--ice);padding:3px 6px;margin:-20px 0 12px;transform:rotate(-3deg);border:1px solid var(--ink)}.bubble.user .speaker{background:var(--red);transform:rotate(3deg)}.transcript{display:flex;flex-direction:column;gap:27px;margin:27px 0}.chat-empty{position:relative;border:1px solid #6f828a;background:#171e23;padding:20px 14px 14px;margin:10px 0 0}.chat-empty:before{content:'DIRECT LINE';position:absolute;top:-10px;right:10px;font:700 9px var(--mono);background:var(--ice);color:var(--ink);padding:3px 7px;transform:rotate(4deg)}.chat-empty strong{font:900 28px var(--display);text-transform:uppercase}.chat-empty p{font-size:12px;color:#c1d0d7;margin-top:6px}.prompt-examples{font-size:12px;line-height:1.7;color:#b8c5cb;margin-top:12px;border-top:1px dashed #5a6b75;padding-top:10px}
 .history{position:relative;border:1px solid #59656d;border-left:4px solid var(--red);padding:13px;margin:14px 0;background:#1b2227;box-shadow:3px 3px 0 #000}.history:before{content:'';position:absolute;right:8px;top:-4px;width:35px;height:7px;background:#bce9f355;transform:rotate(6deg);pointer-events:none}.history p{font-size:12px;color:#b9c6ce}.history button{font-size:12px;margin-top:10px;min-height:40px}.history summary{cursor:pointer;font-size:12px;min-height:28px;overflow-wrap:anywhere}.summary{white-space:pre-wrap;font-size:12px;color:#d3dce2;margin-top:12px}.empty{font:12px/1.65 var(--mono);color:#b4c4ce;padding:20px 13px;border:1px dashed #52616a;margin:16px 0;background:#0f1519}.empty:before{content:'[ — ] ';color:var(--red)}
 .phone{position:relative;background:#07090c;border:5px solid #929b9f;border-radius:32px;padding:8px;overflow:hidden;box-shadow:0 0 0 2px #050709,6px 7px 0 #3b505b;margin:22px 2px 10px}.phone-label{display:flex;justify-content:space-between;gap:8px;color:var(--ice);font:8px var(--mono);padding:2px 5px 8px}.island{height:14px;width:76px;background:#000;margin:0 auto 9px;border:1px solid #292f34;border-radius:25px}.phone iframe{display:block;border:0;border-radius:4px;width:100%}.phone-bottom{background:#dce5ef;width:85px;height:4px;border-radius:4px;margin:12px auto 3px}.gallery-empty{border:2px solid #a6b3b8;background:#141a1f;min-height:170px;display:grid;place-content:center;text-align:center;position:relative;padding:25px 20px;box-shadow:5px 5px 0 #3e505a;margin-top:25px}.gallery-empty:before{content:'NO SIGNAL';background:var(--red);color:var(--ink);font:900 36px var(--display);transform:rotate(-4deg);padding:0 13px;margin:0 auto 12px;box-shadow:3px 3px 0 #000}.gallery-empty p{font-size:12px;color:#c1d0d7}.gallery-empty small{font:9px var(--mono);margin-top:10px}
-.mascot{pointer-events:auto;padding:0!important;border:0!important;background:transparent!important;border-radius:0;width:100%;height:100%;position:relative;touch-action:none;box-shadow:none}.mascot img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(1px 1px 0 #bce9f3bb) drop-shadow(0 5px 7px #000b)}.mascot:after{content:'KAZZ.EXE';position:absolute;right:2%;bottom:2%;font:800 8px/1.4 var(--mono);letter-spacing:.5px;padding:2px 4px;background:var(--red);color:var(--ink);border:1px solid var(--ink);transform:rotate(-8deg);box-shadow:2px 2px 0 #000}.mascot .dot{position:absolute;right:9%;bottom:21%;height:8px;width:8px;background:var(--acid);border:1px solid var(--ink)}.mascot.busy .dot{background:var(--red);animation:pulse 1.3s ease-in-out infinite}@keyframes pulse{50%{opacity:.4;transform:scale(.7)}}
+.mascot{cursor:grab;pointer-events:auto;padding:0!important;border:0!important;background:transparent!important;border-radius:0;width:100%;height:100%;position:relative;touch-action:none;box-shadow:none}.mascot img{pointer-events:none;user-select:none;-webkit-user-drag:none;width:100%;height:100%;object-fit:contain;filter:drop-shadow(1px 1px 0 #bce9f3bb) drop-shadow(0 5px 7px #000b)}.mascot:after{content:'KAZZ.EXE';position:absolute;right:2%;bottom:2%;font:800 8px/1.4 var(--mono);letter-spacing:.5px;padding:2px 4px;background:var(--red);color:var(--ink);border:1px solid var(--ink);transform:rotate(-8deg);box-shadow:2px 2px 0 #000}.mascot .dot{position:absolute;right:9%;bottom:21%;height:8px;width:8px;background:var(--acid);border:1px solid var(--ink)}.mascot.busy .dot{background:var(--red);animation:pulse 1.3s ease-in-out infinite}@keyframes pulse{50%{opacity:.4;transform:scale(.7)}}
+[data-dragging]{cursor:grabbing!important}
 /* The surface is a constellation of controls, not a rectangular window.
    Only painted, interactive pieces receive input. Gaps belong to the chat. */
 :host{pointer-events:none}
-.shell{height:100%;display:flex;flex-direction:column;isolation:isolate;pointer-events:none;background:none;border:0;box-shadow:none;overflow:visible}
+.shell{container:kazz / inline-size;width:125%;height:125%;transform:scale(.8);transform-origin:top left;display:flex;flex-direction:column;isolation:isolate;pointer-events:none;background:none;border:0;box-shadow:none;overflow:visible}
 .top{display:flex;align-items:flex-start;gap:12px;flex-shrink:0;padding:6px 14px 10px;pointer-events:none}
-.title{margin-right:auto;max-width:calc(100% - 116px);transform:rotate(-2deg);pointer-events:auto;cursor:grab}
+.title{margin-right:auto;max-width:calc(100% - 116px);transform:rotate(-2deg);pointer-events:auto;cursor:grab;touch-action:none;user-select:none}
 .brand-line{display:block;background:var(--ink);border:1px solid var(--ice);color:var(--paper);padding:4px 10px;box-shadow:3px 3px 0 var(--red)}
 .brand{font:900 italic 25px/1 var(--display);letter-spacing:.2px}.brand em{font:10px var(--mono);color:var(--red);margin-left:3px}
 .top .badge{display:none}.chat-name{display:block;background:var(--paper);color:var(--ink);font:9px/1.5 var(--mono);padding:2px 8px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:5px 8px 0 0}
@@ -135,7 +118,7 @@ nav button:nth-child(even){transform:rotate(2deg)}nav .nav-index{font:8px var(--
 .chat-empty{pointer-events:auto;background:var(--ink);box-shadow:3px 3px 0 var(--red);transform:rotate(1deg)}.chat-disclaimer{pointer-events:auto;display:block;background:var(--ink);border-left:3px solid var(--red);padding:8px 10px;margin:20px 10px 0 25px;font:9px/1.5 var(--mono)}
 .off-duty{height:150px;max-width:90%;object-fit:contain;justify-self:center;margin-bottom:15px}
 @container kazz (max-width:400px){.top{gap:8px;padding:5px 9px 10px}.brand{font-size:22px}.title{max-width:calc(100% - 100px)}.chat-name{max-width:180px}.body{padding:6px 10px 18px}.orbit{height:480px}.speech{font-size:29px;left:9%;width:80%;padding:11px 14px}.speech span{font-size:7px}.orbit-kazz{left:-3%;width:92%;top:68px;height:308px}.orbit-stamp{top:117px;font-size:11px;right:4px}.shard{width:43%;padding:9px 8px 11px}.shard strong{font-size:24px}.shard small{font-size:7px}.shard>span{font-size:9px}.shard-edit{top:250px}.shard-chat{top:236px}.shard-slop{top:348px;left:2%}.shard-gallery{top:333px;right:1%}.shard-notebook{top:436px;right:3%;width:55%;padding:5px 10px 8px}.shard-notebook strong{font-size:22px}.home-target{margin-left:2%;margin-right:3px}.target-tools .row{gap:7px}.target-tools button{font-size:10px;padding:7px 8px}.workbench{padding:14px 12px}.section-head h2{font-size:31px}.chat-perch{height:218px}.chat-perch img{width:84%;right:6%;height:235px}.chat-taunt{font-size:20px}.bubble.user{margin-left:32px}}
-@media(max-width:600px){.top{padding-top:max(8px,env(safe-area-inset-top))}.status{margin-bottom:max(10px,env(safe-area-inset-bottom))}input,textarea,select{font-size:16px}nav button{min-height:38px}.target-tools button{min-height:44px}.body{padding-bottom:24px}}
+@media(max-width:600px){.top{padding-top:max(8px,env(safe-area-inset-top))}.status{margin-bottom:max(10px,env(safe-area-inset-bottom))}input,textarea,select{font-size:20px}button{min-height:55px}.icon,.quick-settings{min-height:55px;min-width:55px}.title{max-width:calc(100% - 126px)}nav button{min-height:55px}.target-tools button{min-height:55px}.body{padding-bottom:24px}}
 @container kazz (max-width:340px){.orbit{height:500px}.shard strong{font-size:21px}.shard small{font-size:7px}.shard>span{font-size:8px}.shard-slop{top:355px}.shard-gallery{top:342px}.shard-notebook{top:447px;width:65%}.shard-notebook strong{font-size:20px}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 
@@ -180,6 +163,421 @@ function messageInView(dom) {
   return best?.id ?? null;
 }
 
+// src/drag.ts
+function draggable(handle, widget) {
+  let gesture;
+  let suppressUntil = 0;
+  const scale = () => {
+    const width = widget.root.offsetWidth;
+    return width ? widget.root.getBoundingClientRect().width / width || 1 : 1;
+  };
+  const move = (x, y, ratio = scale()) => {
+    const bounds = widget.root.getBoundingClientRect();
+    widget.moveTo(Math.max(8, Math.min(x, (window.innerWidth - bounds.width) / ratio - 8)), Math.max(8, Math.min(y, (window.innerHeight - bounds.height) / ratio - 8)));
+  };
+  const cancel = () => {
+    const id = gesture?.id;
+    gesture = undefined;
+    delete handle.dataset.dragging;
+    if (id !== undefined && handle.hasPointerCapture?.(id))
+      handle.releasePointerCapture(id);
+  };
+  const down = (event) => {
+    if (event.button !== 0 || event.isPrimary === false || gesture)
+      return;
+    event.stopPropagation();
+    suppressUntil = 0;
+    gesture = { id: event.pointerId, x: event.clientX, y: event.clientY, start: widget.getPosition(), scale: scale(), moved: false };
+    handle.setPointerCapture?.(event.pointerId);
+  };
+  const drag = (event) => {
+    if (!gesture || event.pointerId !== gesture.id)
+      return;
+    const dx = event.clientX - gesture.x, dy = event.clientY - gesture.y;
+    if (!gesture.moved && Math.hypot(dx, dy) < 5)
+      return;
+    gesture.moved = true;
+    handle.dataset.dragging = "";
+    suppressUntil = Date.now() + 700;
+    if (event.cancelable)
+      event.preventDefault();
+    move(gesture.start.x + dx / gesture.scale, gesture.start.y + dy / gesture.scale, gesture.scale);
+  };
+  const finish = (event) => {
+    if (!gesture || event.pointerId !== gesture.id)
+      return;
+    if (event.type === "pointerup")
+      drag(event);
+    cancel();
+  };
+  const click = (event) => {
+    if (event.detail !== 0 && Date.now() < suppressUntil) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  };
+  const preventDrag = (event) => event.preventDefault();
+  const key = (event) => {
+    const delta = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key];
+    if (!delta)
+      return;
+    event.preventDefault();
+    event.stopPropagation();
+    const p = widget.getPosition(), step = event.shiftKey ? 40 : 10;
+    move(p.x + delta[0] * step, p.y + delta[1] * step);
+  };
+  handle.style.touchAction = "none";
+  handle.style.userSelect = "none";
+  handle.addEventListener("pointerdown", down);
+  handle.addEventListener("click", click, true);
+  handle.addEventListener("dragstart", preventDrag);
+  handle.addEventListener("keydown", key);
+  handle.addEventListener("lostpointercapture", cancel);
+  window.addEventListener("pointermove", drag, { passive: false });
+  window.addEventListener("pointerup", finish);
+  window.addEventListener("pointercancel", finish);
+  window.addEventListener("blur", cancel);
+  return { cancel, destroy() {
+    cancel();
+    handle.removeEventListener("pointerdown", down);
+    handle.removeEventListener("click", click, true);
+    handle.removeEventListener("dragstart", preventDrag);
+    handle.removeEventListener("keydown", key);
+    handle.removeEventListener("lostpointercapture", cancel);
+    window.removeEventListener("pointermove", drag);
+    window.removeEventListener("pointerup", finish);
+    window.removeEventListener("pointercancel", finish);
+    window.removeEventListener("blur", cancel);
+  } };
+}
+
+// src/native-selection.ts
+function readNativeSelection(dom) {
+  const selection = window.getSelection();
+  if (!selection?.rangeCount || selection.isCollapsed)
+    return;
+  const range = selection.getRangeAt(0);
+  const element = (node) => node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+  const a = element(range.startContainer), b = element(range.endContainer);
+  if (!a || !b)
+    return;
+  const excluded = 'button,input,textarea,select,[contenteditable]:not([contenteditable="false"]),[data-kazzware-owned],header,h1,h2,h3,h4,h5,h6';
+  if (a.closest(excluded) || b.closest(excluded))
+    return;
+  const messageId = dom.getMessageId(a);
+  if (!messageId || messageId !== dom.getMessageId(b))
+    return;
+  const text = selection.toString();
+  if (!text.trim() || text.length > 1e5)
+    return;
+  return { messageId, text, domRange: range.cloneRange() };
+}
+function nativeRange(source, selected) {
+  if (!selected.trim())
+    return;
+  const chars = [], starts = [], ends = [];
+  for (let i = 0;i < source.length; i++) {
+    if (/\s/u.test(source[i])) {
+      if (chars.at(-1) === " ")
+        ends[ends.length - 1] = i + 1;
+      else {
+        chars.push(" ");
+        starts.push(i);
+        ends.push(i + 1);
+      }
+    } else {
+      chars.push(source[i]);
+      starts.push(i);
+      ends.push(i + 1);
+    }
+  }
+  const found = uniqueRange(chars.join(""), selected.replace(/\s+/gu, " "));
+  if (found)
+    return { start: starts[found.start], end: ends[found.end - 1] };
+}
+
+// src/selection-prompt.ts
+function selectionPrompt(dom, options) {
+  const portal = dom.createElement("div");
+  portal.dataset.kazzwareOwned = "selection";
+  Object.assign(portal.style, { position: "fixed", zIndex: "2147483000", width: "min(350px, calc(100vw - 16px))", pointerEvents: "auto" });
+  document.body.append(portal);
+  portal.hidden = true;
+  const root = portal.attachShadow({ mode: "open" });
+  root.innerHTML = `<style>:host{color:#eeeede;font:13px/1.5 system-ui;color-scheme:dark}*{box-sizing:border-box}[hidden]{display:none!important}form{margin:0;padding:12px;background:#11171c;border:2px solid #bce9f3;box-shadow:4px 5px 0 #ff4b57}header{display:flex;align-items:center;gap:8px;font:700 12px ui-monospace,monospace;color:#bce9f3}header button{margin-left:auto}button,input{font:inherit;border:1px solid #8098a4;border-radius:2px;color:#eeeede;background:#202a32;min-height:44px;padding:8px}button{cursor:pointer}button:disabled{opacity:.45;cursor:wait}input{width:100%;font-size:16px;margin:10px 0;background:#0b1015}label{display:block;margin-top:7px}button:focus-visible,input:focus-visible{outline:2px solid #ff4b57;outline-offset:2px}.quote{font-size:11px;color:#b6c9d3;overflow:hidden;max-height:3em;overflow-wrap:anywhere;margin:8px 0}.actions{display:flex;gap:8px;flex-wrap:wrap}.apply{background:#ff4b57;color:#0c0e12;font-weight:800}.feedback{margin-top:8px;font-size:12px;color:#d8ef89}.feedback.error{color:#ffadb5}</style><form aria-label="Edit highlighted text"><header>✂ KAZZ / JUST THIS BIT<button type="button" class="close" aria-label="Close selection editor">×</button></header><div class="quote"></div><label for="selection-direction">What should change?</label><input id="selection-direction" maxlength="8000" placeholder="Shorter? Different POV? Spit it out…" autocomplete="off"><div class="actions"><button class="apply" type="submit" disabled>Edit selection</button><button class="more" type="button" disabled>More options ↗</button><button class="undo" type="button" hidden>Undo edit</button></div><div class="feedback" role="status" aria-live="polite"></div></form>`;
+  const input = root.querySelector("input"), apply = root.querySelector(".apply"), more = root.querySelector(".more"), undo = root.querySelector(".undo"), feedback = root.querySelector(".feedback");
+  let sequence = 0, timer, selected;
+  let message, range, undoId = "", working = false, dismissed = "";
+  let lastAnchor;
+  const signature = (selection) => selection.messageId + "\x00" + selection.text;
+  const say = (text, error = false) => {
+    feedback.textContent = text;
+    feedback.classList.toggle("error", error);
+  };
+  const close = () => {
+    if (selected)
+      dismissed = signature(selected);
+    ++sequence;
+    clearTimeout(timer);
+    selected = undefined;
+    message = undefined;
+    range = undefined;
+    portal.hidden = true;
+    working = false;
+  };
+  function position() {
+    if (portal.hidden || !selected)
+      return;
+    if (!selected.domRange.startContainer.isConnected && !working && !undoId) {
+      close();
+      return;
+    }
+    const measured = selected.domRange.getBoundingClientRect?.();
+    if (measured && (measured.width || measured.height))
+      lastAnchor = measured;
+    const rect = lastAnchor;
+    if (!rect)
+      return;
+    const viewport = window.visualViewport;
+    const left = viewport?.offsetLeft || 0, top = viewport?.offsetTop || 0, width = viewport?.width || window.innerWidth, height = viewport?.height || window.innerHeight;
+    const box = portal.getBoundingClientRect();
+    portal.style.left = `${Math.max(left + 8, Math.min(rect.left, left + width - box.width - 8))}px`;
+    portal.style.top = `${Math.max(top + 8, Math.min(rect.bottom + 10 + box.height <= top + height - 8 ? rect.bottom + 10 : rect.top - box.height - 10, top + height - box.height - 8))}px`;
+    portal.style.maxHeight = `${Math.max(100, height - 16)}px`;
+    portal.style.overflowY = "auto";
+  }
+  function capture() {
+    if (!options.available() || working || document.activeElement === portal)
+      return;
+    const next = readNativeSelection(dom);
+    if (!next) {
+      if (!undoId)
+        close();
+      dismissed = "";
+      return;
+    }
+    if (signature(next) === dismissed || selected && signature(next) === signature(selected))
+      return;
+    clearTimeout(timer);
+    ++sequence;
+    selected = next;
+    lastAnchor = undefined;
+    message = undefined;
+    range = undefined;
+    undoId = "";
+    undo.hidden = true;
+    input.value = "";
+    input.disabled = false;
+    apply.disabled = true;
+    more.disabled = true;
+    options.pin();
+    root.querySelector(".quote").textContent = next.text.slice(0, 200);
+    say("Checking the highlight…");
+    portal.hidden = false;
+    position();
+    const request = sequence;
+    timer = setTimeout(() => {
+      options.load(next.messageId).then((value) => {
+        if (request !== sequence || !options.available())
+          return;
+        message = value;
+        range = nativeRange(value.content, next.text);
+        if (!range) {
+          say("Cannot match this highlight uniquely. Select a smaller plain-text passage in the message.", true);
+          return;
+        }
+        more.disabled = false;
+        apply.disabled = !input.value.trim();
+        say(`Only this passage · ${range.end - range.start} characters`);
+        position();
+      }).catch((error) => {
+        if (request === sequence)
+          say(error.message, true);
+      });
+    }, 160);
+  }
+  input.addEventListener("input", () => {
+    apply.disabled = working || !range || !input.value.trim();
+  });
+  root.querySelector(".close").addEventListener("click", close);
+  more.addEventListener("click", () => {
+    if (!message || !range || working || !options.available())
+      return;
+    options.open(message, range, input.value);
+    close();
+  });
+  root.querySelector("form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!message || !range || !input.value.trim() || !options.available() || working)
+      return;
+    const request = sequence;
+    working = true;
+    apply.disabled = more.disabled = input.disabled = true;
+    say("Stitching it up…");
+    const result = await options.edit(message, range, input.value);
+    if (request !== sequence)
+      return;
+    working = false;
+    if (result.ok) {
+      range = undefined;
+      undoId = result.undoId || "";
+      undo.hidden = !undoId;
+      say("Done. Everything outside the highlight stayed intact.");
+    } else {
+      apply.disabled = more.disabled = input.disabled = false;
+      say(result.error || "Could not edit. Select the passage again if the message changed.", true);
+    }
+    position();
+  });
+  undo.addEventListener("click", async () => {
+    if (!undoId || working || !options.available())
+      return;
+    const request = sequence;
+    working = true;
+    undo.disabled = true;
+    const ok = await options.undo(undoId);
+    if (request !== sequence)
+      return;
+    working = false;
+    undo.disabled = false;
+    if (ok) {
+      undo.hidden = true;
+      say("Undone. Original wording restored.");
+    } else
+      say("Undo could not be applied. Check Editor for details.", true);
+  });
+  const escape = (event) => {
+    if (!portal.hidden && event.key === "Escape") {
+      event.stopImmediatePropagation();
+      close();
+    }
+  };
+  const outside = (event) => {
+    if (!portal.hidden && !event.composedPath().includes(portal))
+      close();
+  };
+  document.addEventListener("selectionchange", capture);
+  document.addEventListener("pointerup", capture);
+  document.addEventListener("pointerdown", outside, true);
+  document.addEventListener("keydown", escape, true);
+  document.addEventListener("scroll", position, true);
+  window.addEventListener("resize", position);
+  window.visualViewport?.addEventListener("resize", position);
+  window.visualViewport?.addEventListener("scroll", position);
+  return { close, reset() {
+    close();
+    dismissed = "";
+  }, destroy() {
+    close();
+    portal.remove();
+    document.removeEventListener("selectionchange", capture);
+    document.removeEventListener("pointerup", capture);
+    document.removeEventListener("pointerdown", outside, true);
+    document.removeEventListener("keydown", escape, true);
+    document.removeEventListener("scroll", position, true);
+    window.removeEventListener("resize", position);
+    window.visualViewport?.removeEventListener("resize", position);
+    window.visualViewport?.removeEventListener("scroll", position);
+  } };
+}
+
+// src/inline-gallery.ts
+var STYLE = `:host{display:block;margin:18px 0 4px;color:#eeeede;font:14px/1.5 system-ui;isolation:isolate}*{box-sizing:border-box}[hidden]{display:none!important}button{cursor:pointer;font:700 13px/1.4 ui-monospace,monospace;color:#bce9f3;background:#12171d;border:1px solid #bce9f3;box-shadow:3px 3px 0 #ff4b57;padding:12px 15px;text-align:left;min-height:44px;max-width:100%;overflow-wrap:anywhere}button:focus-visible{outline:3px solid #ff4b57;outline-offset:4px}small{display:block;color:#b5c5cb;font:10px/1.6 ui-monospace,monospace}strong{display:block;margin-top:4px;color:#eeeede}.feed{margin-top:14px;background:#0c0e12;border:2px solid #7b8e9a;padding:8px;max-width:520px;border-radius:5px}.feed iframe{display:block;width:100%;border:0}.status{margin:8px 0;color:#bce9f3;font:12px/1.5 system-ui}.reload{margin-top:8px;box-shadow:none}`;
+function inlineGallery(dom, load, react) {
+  const entries = new Map;
+  async function expand(entry) {
+    const sequence = ++entry.sequence;
+    entry.frame?.destroy();
+    entry.frame = undefined;
+    const status = entry.shadow.querySelector(".status");
+    status.textContent = "Tuning into the local drama…";
+    try {
+      const page = await load(entry.page.id);
+      if (entries.get(entry.page.id) !== entry || !entry.open || sequence !== entry.sequence)
+        return;
+      if (!page)
+        throw new Error("This saved page is no longer available.");
+      const frame = dom.createSandboxFrame({ html: galleryHTML(page), autoResize: false, minHeight: 350, initialHeight: 440, maxHeight: 440 });
+      entry.frame = frame;
+      frame.element.title = "Fictional Peanut Gallery page";
+      entry.shadow.querySelector(".screen").append(frame.element);
+      status.textContent = "";
+      frame.onMessage(async (payload) => {
+        if (entries.get(page.id) !== entry || !entry.open || sequence !== entry.sequence)
+          return;
+        let data;
+        try {
+          data = object(payload);
+        } catch {
+          return;
+        }
+        if (!["vote", "comment"].includes(String(data.kind)) || !page.posts.some((p) => p.id === data.postId))
+          return;
+        status.textContent = "Saving…";
+        const ok = await react({ pageId: page.id, kind: data.kind, postId: data.postId, text: data.text });
+        if (entries.get(page.id) !== entry || !entry.open || sequence !== entry.sequence)
+          return;
+        if (ok)
+          await expand(entry);
+        else
+          status.textContent = "Could not save. Kazz may be busy; try again.";
+      });
+    } catch (error) {
+      if (entries.get(entry.page.id) === entry && sequence === entry.sequence)
+        status.textContent = error.message;
+    }
+  }
+  function retire(id, entry) {
+    ++entry.sequence;
+    entry.frame?.destroy();
+    dom.uninject(entry.wrapper);
+    entries.delete(id);
+  }
+  return {
+    sync(pages, enabled) {
+      for (const [id, entry] of entries)
+        if (!enabled || !pages.some((page) => page.id === id && page.throughMessage === entry.page.throughMessage))
+          retire(id, entry);
+      if (!enabled)
+        return;
+      for (const page of pages) {
+        if (entries.has(page.id))
+          continue;
+        const message = dom.findMessageElement(page.throughMessage);
+        if (!message)
+          continue;
+        const wrapper = dom.inject(message, "", "beforeend");
+        wrapper.setAttribute("data-kazzware-owned", "gallery");
+        const shadow = wrapper.attachShadow({ mode: "open" });
+        shadow.innerHTML = `<style>${STYLE}</style><button class="toggle" aria-expanded="false"><small>KAZZNET / PEANUT GALLERY · ${escapeHTML(page.format.toUpperCase())}</small><strong>${escapeHTML(page.title)} ↗</strong></button><section class="feed" hidden><div class="status" role="status"></div><div class="screen"></div><button class="reload">Reload page</button></section>`;
+        const entry = { wrapper, shadow, page, open: false, sequence: 0 };
+        entries.set(page.id, entry);
+        wrapper.addEventListener("pointerdown", (event) => event.stopPropagation());
+        wrapper.addEventListener("click", (event) => event.stopPropagation());
+        shadow.querySelector(".toggle").addEventListener("click", () => {
+          entry.open = !entry.open;
+          shadow.querySelector(".toggle").setAttribute("aria-expanded", String(entry.open));
+          shadow.querySelector(".feed").hidden = !entry.open;
+          if (entry.open)
+            expand(entry);
+          else {
+            ++entry.sequence;
+            entry.frame?.destroy();
+            entry.frame = undefined;
+          }
+        });
+        shadow.querySelector(".reload").addEventListener("click", () => {
+          expand(entry);
+        });
+      }
+    },
+    clear() {
+      for (const [id, entry] of entries)
+        retire(id, entry);
+    }
+  };
+}
+
 // src/frontend.ts
 var TABS = [["home", "Kazz"], ["edit", "Editor"], ["slop", "De-slop"], ["chat", "Chat"], ["gallery", "Gallery"], ["notebook", "Notebook"], ["settings", "Settings"]];
 function randomId() {
@@ -211,8 +609,6 @@ function setup(ctx) {
   let view;
   let target;
   let range;
-  let selectedText = "";
-  let selectedMessageId = null;
   let selectionRequest = 0;
   let following = true;
   let picking = false;
@@ -231,8 +627,8 @@ function setup(ctx) {
   let error = false;
   let busy = 0;
   const pending = new Map;
-  const mascot = ctx.ui.createFloatWidget({ width: 110, height: 110, initialPosition: { x: Math.max(0, window.innerWidth - 125), y: Math.max(0, window.innerHeight - 245) }, snapToEdge: true, chromeless: true, tooltip: "KazzWare · your in-chat accomplice" });
-  const panel = ctx.ui.createFloatWidget({ width: Math.min(520, window.innerWidth - 16), height: Math.min(860, window.innerHeight - 24), initialPosition: { x: Math.max(8, window.innerWidth - 540), y: 12 }, chromeless: true, touchScrollMode: "native", tooltip: "KazzWare" });
+  const mascot = ctx.ui.createFloatWidget({ width: 110, height: 110, initialPosition: { x: Math.max(0, window.innerWidth - 125), y: Math.max(0, window.innerHeight - 245) }, snapToEdge: false, chromeless: true, touchScrollMode: "native", tooltip: "KazzWare · your in-chat accomplice" });
+  const panel = ctx.ui.createFloatWidget({ width: Math.min(416, (window.innerWidth - 16) * 0.8), height: Math.min(688, (window.innerHeight - 24) * 0.8), initialPosition: { x: Math.max(8, window.innerWidth - 436), y: 12 }, snapToEdge: false, chromeless: true, touchScrollMode: "native", tooltip: "KazzWare" });
   for (const widget of [mascot, panel]) {
     widget.root.style.width = "100%";
     widget.root.style.height = "100%";
@@ -242,14 +638,22 @@ function setup(ctx) {
   panel.root.style.userSelect = "text";
   panel.root.style.touchAction = "pan-y";
   const petRoot = mascot.root.attachShadow({ mode: "open" });
-  petRoot.innerHTML = `<style>${CSS}</style><button class="mascot" aria-label="Open KazzWare"><img alt="Kazz, a silver-haired cyber-scorpion companion"><span class="dot"></span></button>`;
+  petRoot.innerHTML = `<style>${CSS}</style><button class="mascot" aria-label="Open KazzWare"><img draggable="false" alt="Kazz, a silver-haired cyber-scorpion companion"><span class="dot"></span></button>`;
   const petButton = petRoot.querySelector("button");
   const petImage = petRoot.querySelector("img");
   const root = panel.root.attachShadow({ mode: "open" });
-  root.innerHTML = `<style>${CSS}</style><section class="shell" data-screen="home" aria-label="KazzWare"><header class="top"><div class="title"><div class="brand-line"><span class="brand">KAZZWARE<em>.exe</em></span><span class="badge">FRIENDLY MALWARE</span></div><div class="chat-name"></div></div><button class="quick-settings" aria-label="Connection settings">⚙</button><button class="icon close" aria-label="Close KazzWare">×</button></header><nav aria-label="KazzWare sections"></nav><main class="body"></main><footer class="status" role="status" aria-live="polite"><span></span><button class="cancel-pick" hidden>Cancel pick</button><button class="cancel" hidden>Stop</button></footer></section>`;
+  root.innerHTML = `<style>${CSS}</style><section class="shell" data-screen="home" aria-label="KazzWare"><header class="top"><div class="title" role="button" tabindex="0" aria-label="Move KazzWare menu; drag or use arrow keys" title="Drag to move · arrow keys also work"><div class="brand-line"><span class="brand">KAZZWARE<em>.exe</em></span><span class="badge">FRIENDLY MALWARE</span></div><div class="chat-name"></div></div><button class="quick-settings" aria-label="Connection settings">⚙</button><button class="icon close" aria-label="Close KazzWare">×</button></header><nav aria-label="KazzWare sections"></nav><main class="body"></main><footer class="status" role="status" aria-live="polite"><span></span><button class="cancel-pick" hidden>Cancel pick</button><button class="cancel" hidden>Stop</button></footer></section>`;
   const body = root.querySelector(".body");
   const nav = root.querySelector("nav");
   const statusBox = root.querySelector(".status");
+  const petDrag = draggable(petButton, mascot), panelDrag = draggable(root.querySelector(".title"), panel);
+  let artDrags = [];
+  disposers.push(() => {
+    petDrag.destroy();
+    panelDrag.destroy();
+    for (const drag of artDrags)
+      drag.destroy();
+  });
   body.addEventListener("pointerdown", (event) => event.stopPropagation());
   nav.addEventListener("pointerdown", (event) => event.stopPropagation());
   const notify = (text, failed = false) => {
@@ -310,15 +714,16 @@ function setup(ctx) {
     try {
       const result = await rpc(action, data);
       if (origin !== binding || destroyed)
-        return;
+        return false;
       if (result) {
         view = result;
         await refreshTarget();
         if (origin !== binding)
-          return;
+          return false;
         render();
       }
       notify(success);
+      return true;
     } catch (err) {
       if (origin === binding && !destroyed) {
         notify(err instanceof Error ? err.message : "Something went wrong.", true);
@@ -332,6 +737,7 @@ function setup(ctx) {
           }
         } catch {}
       }
+      return false;
     } finally {
       if (origin === binding) {
         busy = Math.max(0, busy - 1);
@@ -347,8 +753,12 @@ function setup(ctx) {
     try {
       const current = await rpc("message", { messageId: id });
       if (origin === binding && target?.id === id && (current.content !== target.content || current.swipe_id !== target.swipe_id)) {
-        target = current;
-        range = undefined;
+        if (range) {
+          target = undefined;
+          range = undefined;
+          direction = "";
+        } else
+          target = current;
       }
     } catch {
       if (origin === binding && target?.id === id) {
@@ -369,6 +779,9 @@ function setup(ctx) {
     scheduleFollow();
   }
   function hide() {
+    panelDrag.cancel();
+    for (const drag of artDrags)
+      drag.cancel();
     stopPicking();
     opened = false;
     invalidateSelection();
@@ -405,7 +818,7 @@ function setup(ctx) {
   disposers.push(() => inputAction.destroy());
   if (ctx.registerMessageAction) {
     const action = ctx.registerMessageAction({ id: "kazzware-edit", label: "Send to Kazz", onClick: (id) => {
-      selectMessage(id, selectedMessageId === id ? selectedText : "");
+      selectMessage(id);
     } });
     disposers.push(() => action.destroy());
   }
@@ -431,7 +844,13 @@ function setup(ctx) {
       if (target?.id !== id)
         direction = "";
       target = message;
-      range = highlighted ? uniqueRange(message.content, highlighted) : undefined;
+      range = highlighted ? nativeRange(message.content, highlighted) : undefined;
+      if (highlighted && !range) {
+        target = undefined;
+        show("edit");
+        notify("Cannot match this highlight uniquely. Select a smaller passage in the native message.", true);
+        return;
+      }
       if (automatic) {
         if (tab === "edit")
           render();
@@ -442,7 +861,7 @@ function setup(ctx) {
       show("edit");
       paintTarget();
       body.querySelector(".pick-message")?.focus();
-      notify(highlighted && !range ? "That highlight cannot be mapped exactly. Select it in the source box below." : range ? "Only the highlighted source text will change." : "Message selected. Edits apply immediately; Undo stays available.");
+      notify(range ? "Only the highlighted native text will change." : "Message selected. Edits apply immediately; Undo stays available.");
     } catch (err) {
       if (origin === binding && sequence === selectionRequest && !destroyed)
         notify(err.message, true);
@@ -460,6 +879,7 @@ function setup(ctx) {
     const description = target ? `#${target.index_in_chat + 1} · ${target.name}` : "No message in view";
     body.querySelectorAll(".target-name").forEach((el) => {
       el.textContent = description;
+      el.dataset.messageId = target?.id || "";
     });
     body.querySelectorAll(".follow-target").forEach((el) => {
       el.textContent = following ? "◎ Following view" : "⌖ Pinned · follow view";
@@ -551,7 +971,7 @@ function setup(ctx) {
     });
     paintTarget();
   }
-  const ownEvent = (event) => event.composedPath().includes(panel.root) || event.composedPath().includes(mascot.root);
+  const ownEvent = (event) => event.composedPath().includes(panel.root) || event.composedPath().includes(mascot.root) || event.composedPath().some((node) => node instanceof Element && node.hasAttribute("data-kazzware-owned"));
   const pickClick = (event) => {
     if (!picking || ownEvent(event) || !(event.target instanceof Element))
       return;
@@ -560,7 +980,7 @@ function setup(ctx) {
       return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    selectMessage(id, selectedMessageId === id ? selectedText : "");
+    selectMessage(id);
   };
   const hoverPick = (event) => {
     if (!picking)
@@ -590,7 +1010,10 @@ function setup(ctx) {
   document.addEventListener("pointermove", hoverPick, true);
   document.addEventListener("keydown", cancelPick, true);
   document.addEventListener("scroll", nativeScroll, true);
-  const observer = new window.MutationObserver(scheduleFollow);
+  const observer = new window.MutationObserver(() => {
+    scheduleFollow();
+    syncGallery();
+  });
   observer.observe(document.body, { childList: true, subtree: true });
   disposers.push(() => {
     clearTimeout(followTimer);
@@ -602,32 +1025,47 @@ function setup(ctx) {
     document.removeEventListener("keydown", cancelPick, true);
     document.removeEventListener("scroll", nativeScroll, true);
   });
-  const captureSelection = () => {
-    const selection = window.getSelection();
-    if (!selection?.rangeCount || selection.isCollapsed)
-      return;
-    const anchor = selection.anchorNode?.nodeType === Node.ELEMENT_NODE ? selection.anchorNode : selection.anchorNode?.parentElement;
-    const focus = selection.focusNode?.nodeType === Node.ELEMENT_NODE ? selection.focusNode : selection.focusNode?.parentElement;
-    if (!anchor || !focus || root.contains(anchor) || petRoot.contains(anchor))
-      return;
-    const a = ctx.dom.getMessageId(anchor), b = ctx.dom.getMessageId(focus);
-    if (a && a === b) {
-      selectedText = selection.toString();
-      selectedMessageId = a;
-    }
-  };
-  document.addEventListener("selectionchange", captureSelection);
-  disposers.push(() => document.removeEventListener("selectionchange", captureSelection));
+  const inline = inlineGallery(ctx.dom, (id) => rpc("page", { pageId: id }), async (data) => {
+    if (busy)
+      return false;
+    return run("react", data, "Saved in your fictional fandom.");
+  });
+  function syncGallery() {
+    inline.sync(view?.state.pages || [], !!view?.state.settings.galleryEnabled && !!chatId);
+  }
+  disposers.push(() => inline.clear());
+  const prompt = selectionPrompt(ctx.dom, {
+    available: () => !!chatId && !!view && !busy && !destroyed && !picking,
+    load: (id) => rpc("message", { messageId: id }),
+    pin: pinTarget,
+    open(message, selectedRange, text) {
+      target = message;
+      range = selectedRange;
+      direction = text;
+      pinTarget();
+      show("edit");
+    },
+    async edit(message, selectedRange, text) {
+      target = message;
+      range = selectedRange;
+      direction = text;
+      pinTarget();
+      const previousUndo = view?.state.undo.at(-1)?.id;
+      const ok = await run("edit", { messageId: message.id, expected: message.content, swipe: message.swipe_id, direction: text, mode: "reform", range: selectedRange }, "Selection edited. Undo is available.");
+      const latest = view?.state.undo.at(-1);
+      return { ok, undoId: ok && latest?.id !== previousUndo ? latest?.id : undefined, error: status };
+    },
+    undo: (id) => run("undo", { undoId: id }, "Undone. Original wording restored.")
+  });
+  disposers.push(() => prompt.destroy());
   const resize = () => {
-    const mobile = window.innerWidth <= 600;
-    panel.setFullscreen(mobile);
-    panel.root.style.height = mobile ? `${Math.max(200, window.visualViewport?.height || window.innerHeight)}px` : "100%";
-    scheduleFollow();
-    if (mobile)
-      return;
-    panel.setSize(Math.min(520, window.innerWidth - 16), Math.max(200, Math.min(860, (window.visualViewport?.height || window.innerHeight) - 24)));
+    panel.setFullscreen(false);
+    const width = Math.min(416, (window.innerWidth - 16) * 0.8);
+    const height = Math.max(160, Math.min(688, ((window.visualViewport?.height || window.innerHeight) - 24) * 0.8));
+    panel.setSize(width, height);
     const pos = panel.getPosition();
-    panel.moveTo(Math.max(8, Math.min(pos.x, window.innerWidth - Math.min(520, window.innerWidth - 16) - 8)), Math.max(8, Math.min(pos.y, 24)));
+    panel.moveTo(Math.max(8, Math.min(pos.x, window.innerWidth - width - 8)), Math.max(8, Math.min(pos.y, (window.visualViewport?.height || window.innerHeight) - height - 8)));
+    scheduleFollow();
   };
   window.addEventListener("resize", resize);
   window.visualViewport?.addEventListener("resize", resize);
@@ -649,6 +1087,10 @@ function setup(ctx) {
       item.reject(new Error("Chat changed."));
     }
     pending.clear();
+    prompt.reset();
+    inline.clear();
+    petDrag.cancel();
+    panelDrag.cancel();
     stopPicking();
     following = true;
     invalidateSelection();
@@ -662,8 +1104,6 @@ function setup(ctx) {
     askDraft = "";
     slopDraft = undefined;
     settingsDraft = undefined;
-    selectedText = "";
-    selectedMessageId = null;
     pageId = "";
     busy = 0;
     frame?.destroy();
@@ -692,6 +1132,10 @@ function setup(ctx) {
     return `<div class="section-head"><div class="eyebrow">${code}</div><h2>${title}</h2><span class="badge">${tag}</span></div>`;
   }
   function render() {
+    for (const drag of artDrags)
+      drag.destroy();
+    artDrags = [];
+    syncGallery();
     frame?.destroy();
     frame = undefined;
     markTarget();
@@ -727,11 +1171,17 @@ function setup(ctx) {
       sheet.append(...Array.from(body.childNodes));
       body.append(sheet);
     }
+    body.querySelectorAll(".orbit-kazz,.chat-perch img,.off-duty").forEach((art) => {
+      art.draggable = false;
+      art.style.pointerEvents = "auto";
+      art.style.cursor = "grab";
+      artDrags.push(draggable(art, panel));
+    });
     paintTarget();
     paintStatus();
   }
   function renderHome() {
-    body.innerHTML = `<div class="orbit"><div class="speech">Need me to fuck<br>some shit up?<span>YOUR FRIENDLY NEIGHBORHOOD MALWARE</span></div><img class="orbit-kazz" src="${kazz_perched_default}" alt="Kazz perched on his mechanical tail"><span class="orbit-stamp" aria-hidden="true">100%<br>YOUR PROBLEM</span><button class="shard shard-edit" data-go="edit"><small>01 / MESSAGE SURGERY</small><strong>Cut the crap.</strong><span>Rewrite + Undo ↗</span></button><button class="shard shard-slop" data-go="slop"><small>02 / EVICTION LIST</small><strong>No more slop.</strong><span>Ban the usual suspects ↗</span></button><button class="shard shard-chat" data-go="chat"><small>03 / DIRECT LINE</small><strong>Psst. Kazz.</strong><span>Ask your accomplice ↗</span></button><button class="shard shard-gallery" data-go="gallery"><small>04 / PEANUT GALLERY</small><strong>Start shit.</strong><span>Wake the fandom ↗</span></button><button class="shard shard-notebook" data-go="notebook"><small>05 / THE RECEIPTS</small><strong>Evidence locker.</strong><span>Summaries + lore ↗</span></button></div><form class="quick-ask"><label for="home-ask">GOT A PROBLEM?</label><div><input id="home-ask" class="home-ask" placeholder="Spit it out…" value="${escapeHTML(askDraft)}" maxlength="20000"><button class="primary" aria-label="Send to Kazz" data-mutate>↗</button></div></form><div class="home-target">${targetControls()}</div>${!view.state.settings.connectionId ? '<button class="plug" data-go="settings">Plug me in ↗ Choose a connection</button>' : ""}`;
+    body.innerHTML = `<div class="orbit"><div class="speech">Need me to fuck<br>some shit up?<span>YOUR FRIENDLY NEIGHBORHOOD MALWARE</span></div><img draggable="false" class="orbit-kazz" src="${kazz_perched_default}" alt="Kazz perched on his mechanical tail"><span class="orbit-stamp" aria-hidden="true">100%<br>YOUR PROBLEM</span><button class="shard shard-edit" data-go="edit"><small>01 / MESSAGE SURGERY</small><strong>Cut the crap.</strong><span>Rewrite + Undo ↗</span></button><button class="shard shard-slop" data-go="slop"><small>02 / EVICTION LIST</small><strong>No more slop.</strong><span>Ban the usual suspects ↗</span></button><button class="shard shard-chat" data-go="chat"><small>03 / DIRECT LINE</small><strong>Psst. Kazz.</strong><span>Ask your accomplice ↗</span></button><button class="shard shard-gallery" data-go="gallery"><small>04 / PEANUT GALLERY</small><strong>Start shit.</strong><span>Wake the fandom ↗</span></button><button class="shard shard-notebook" data-go="notebook"><small>05 / THE RECEIPTS</small><strong>Evidence locker.</strong><span>Summaries + lore ↗</span></button></div><form class="quick-ask"><label for="home-ask">GOT A PROBLEM?</label><div><input id="home-ask" class="home-ask" placeholder="Spit it out…" value="${escapeHTML(askDraft)}" maxlength="20000"><button class="primary" aria-label="Send to Kazz" data-mutate>↗</button></div></form><div class="home-target">${targetControls()}</div>${!view.state.settings.connectionId ? '<button class="plug" data-go="settings">Plug me in ↗ Choose a connection</button>' : ""}`;
     body.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => show(b.dataset.go)));
     body.querySelector(".home-ask").addEventListener("input", (ev) => {
       askDraft = ev.target.value;
@@ -748,30 +1198,9 @@ function setup(ctx) {
     wireTargetControls();
   }
   function renderEditor() {
-    const messages = view.messages;
-    body.innerHTML = `${heading("01 / EDITOR", "Message surgery", "CUT + STITCH")}${targetControls()}<p class="muted">Follow what you’re reading, or pick a message directly. Writing a direction pins the target.</p><label class="field">Recent messages<select class="messages"><option value="">Choose a message…</option>${[...messages].reverse().map((m) => `<option value="${escapeHTML(m.id)}" ${m.id === target?.id ? "selected" : ""}>${m.index_in_chat + 1} · ${escapeHTML(m.name)} · ${escapeHTML(m.content.slice(0, 65).replace(/\n/g, " "))}</option>`).join("")}</select></label>${view.totalMessages > messages.length ? "<small>Showing the latest 100. Use the message menu or ask Kazz to search older messages.</small>" : ""}${target ? `<label class="field">Source text · select a section to limit the edit<textarea class="raw" readonly aria-label="Message source">${escapeHTML(target.content)}</textarea><div class="range"></div></label><div class="row"><button class="clear-range">Use whole message</button><button class="reload">Reload source</button></div><label class="field">Your direction<textarea class="direction" placeholder="Shorten this. Keep the tension, lose the three-paragraph weather report.">${escapeHTML(direction)}</textarea></label><div class="row"><button class="primary apply" data-mutate>Edit now</button><button class="deslop" data-mutate>De-slop now</button></div><small>Same narrative moment unless you explicitly ask to advance it.</small>` : '<div class="empty">No message selected yet.</div>'}<h3 style="margin-top:26px">Undo history · latest 20 edits</h3>${[...view.state.undo].reverse().map((u) => `<div class="history"><strong>${escapeHTML(u.label)}</strong><p>${new Date(u.createdAt).toLocaleString()} · ${u.status === "prepared" ? "Recovery record — check current message" : u.status}</p><button data-undo="${escapeHTML(u.id)}" data-mutate ${u.status === "undone" ? "hidden" : ""}>Undo this edit</button></div>`).join("") || '<p class="empty">No Kazz edits in this chat yet.</p>'}`;
+    body.innerHTML = `${heading("01 / EDITOR", "Message surgery", "CUT + STITCH")}${targetControls()}<p class="muted">Select text directly in the chat for a precise edit. Writing a direction pins the target.</p>${target ? `<div class="range" role="status">${range ? `Native highlight · ${range.end - range.start} characters only` : "Whole message selected"}</div>${range ? '<button class="clear-range">Use whole message instead</button>' : ""}<label class="field">Your direction<textarea class="direction" placeholder="Shorten this. Keep the tension, lose the three-paragraph weather report.">${escapeHTML(direction)}</textarea></label><div class="row"><button class="primary apply" data-mutate>Edit now</button><button class="deslop" data-mutate>De-slop now</button></div><small>Same narrative moment unless you explicitly ask to advance it.</small>` : '<div class="empty">Pick a native message or highlight a passage in the chat.</div>'}<h3 style="margin-top:26px">Undo history · latest 20 edits</h3>${[...view.state.undo].reverse().map((u) => `<div class="history"><strong>${escapeHTML(u.label)}</strong><p>${new Date(u.createdAt).toLocaleString()} · ${u.status === "prepared" ? "Recovery record — check current message" : u.status}</p><button data-undo="${escapeHTML(u.id)}" data-mutate ${u.status === "undone" ? "hidden" : ""}>Undo this edit</button></div>`).join("") || '<p class="empty">No Kazz edits in this chat yet.</p>'}`;
     wireTargetControls();
-    body.querySelector("select").addEventListener("focus", pinTarget);
-    body.querySelector("select").addEventListener("change", (ev) => {
-      const id = ev.target.value;
-      if (id)
-        selectMessage(id);
-    });
-    const raw = body.querySelector(".raw");
-    const selectionLabel = () => {
-      const label = body.querySelector(".range");
-      if (label)
-        label.textContent = range ? `Selection only · ${range.end - range.start} characters` : "Whole message selected";
-    };
-    if (raw) {
-      if (range)
-        raw.setSelectionRange(textareaOffset(target.content, range.start), textareaOffset(target.content, range.end));
-      raw.addEventListener("focus", pinTarget);
-      raw.addEventListener("select", () => {
-        pinTarget();
-        range = raw.selectionEnd > raw.selectionStart ? textareaRange(target.content, raw.selectionStart, raw.selectionEnd) : undefined;
-        selectionLabel();
-      });
+    if (target) {
       body.querySelector(".direction").addEventListener("focus", pinTarget);
       body.querySelector(".direction").addEventListener("input", (ev) => {
         pinTarget();
@@ -779,12 +1208,7 @@ function setup(ctx) {
       });
       button(".clear-range", () => {
         range = undefined;
-        raw.setSelectionRange(0, 0);
-        selectionLabel();
-      });
-      button(".reload", () => {
-        if (target)
-          selectMessage(target.id);
+        render();
       });
       const edit = (mode) => {
         pinTarget();
@@ -793,7 +1217,6 @@ function setup(ctx) {
       };
       button(".apply", () => edit("reform"));
       button(".deslop", () => edit("deslop"));
-      selectionLabel();
     }
     body.querySelectorAll("[data-undo]").forEach((b) => b.addEventListener("click", () => {
       run("undo", { undoId: b.dataset.undo }, "Undone. Previous wording restored.");
@@ -818,7 +1241,7 @@ function setup(ctx) {
     });
   }
   function renderChat() {
-    body.innerHTML = `<div class="chat-perch"><span class="chat-taunt">Yeah. I’m listening.</span><img src="${kazz_listening_default}" alt="Kazz leaning on the message input"></div><form class="chat-compose"><label for="kazz-ask">YOUR DIRECT LINE / KAZZ</label><textarea id="kazz-ask" class="ask" placeholder="Alright, Kazz…">${escapeHTML(askDraft)}</textarea><button class="primary send" type="submit" data-mutate>Send to Kazz ↗</button></form><div class="transcript">${view.state.turns.map((t) => `<div class="bubble ${t.role}"><span class="speaker">${t.role === "user" ? "YOU" : "KAZZ"}</span>${escapeHTML(t.content)}</div>`).join("") || '<div class="chat-empty"><strong>What would you do without me?</strong><p>Find a line. Fix a message. Untangle the lore.<br>Give your resident parasite something to do.</p></div>'}</div><small class="chat-disclaimer">Private to this chat. Requested edits land immediately; Undo lives in Editor.</small>`;
+    body.innerHTML = `<div class="chat-perch"><span class="chat-taunt">Yeah. I’m listening.</span><img draggable="false" src="${kazz_listening_default}" alt="Kazz leaning on the message input"></div><form class="chat-compose"><label for="kazz-ask">YOUR DIRECT LINE / KAZZ</label><textarea id="kazz-ask" class="ask" placeholder="Alright, Kazz…">${escapeHTML(askDraft)}</textarea><button class="primary send" type="submit" data-mutate>Send to Kazz ↗</button></form><div class="transcript">${view.state.turns.map((t) => `<div class="bubble ${t.role}"><span class="speaker">${t.role === "user" ? "YOU" : "KAZZ"}</span>${escapeHTML(t.content)}</div>`).join("") || '<div class="chat-empty"><strong>What would you do without me?</strong><p>Find a line. Fix a message. Untangle the lore.<br>Give your resident parasite something to do.</p></div>'}</div><small class="chat-disclaimer">Private to this chat. Requested edits land immediately; Undo lives in Editor.</small>`;
     body.querySelector(".ask").addEventListener("input", (ev) => {
       askDraft = ev.target.value;
     });
@@ -835,7 +1258,7 @@ function setup(ctx) {
     const state = view.state;
     const page = state.pages.find((p) => p.id === pageId) || state.pages.at(-1);
     pageId = page?.id || "";
-    body.innerHTML = `${heading("04 / BOOTLEG INTERNET", "Peanut Gallery", "FICTIONAL")}<label class="check"><input class="enabled" type="checkbox" ${state.settings.galleryEnabled ? "checked" : ""}>Let the fandom comment</label><small>Every ${state.settings.interval} normal replies · ${state.count} / ${state.settings.interval} counted. No regeneration, swipe or Kazz-reply triggers.</small><div class="row field"><button class="primary generate" data-mutate ${state.settings.galleryEnabled ? "" : "hidden"}>Fresh drama</button><button class="gallery-settings">Configure</button></div><label>Saved pages<select class="pages"><option value="">${state.pages.length ? "Choose a page…" : "No pages yet"}</option>${[...state.pages].reverse().map((p) => `<option value="${escapeHTML(p.id)}" ${p.id === pageId ? "selected" : ""}>${escapeHTML(p.title)}</option>`).join("")}</select></label>${page ? '<div class="phone"><div class="island"></div><div class="phone-label"><span>KAZZNET / LOCAL FEED</span><span>● FICTIONAL</span></div><div class="screen"></div><div class="phone-bottom"></div></div>' : `<div class="gallery-empty"><img class="off-duty" src="${kazz_wink_default}" alt="Kazz lounging off duty"><p>The internet in your pocket is suspiciously quiet.</p><small>Enable the fandom and tap Fresh drama.</small></div>`}`;
+    body.innerHTML = `${heading("04 / BOOTLEG INTERNET", "Peanut Gallery", "FICTIONAL")}<label class="check"><input class="enabled" type="checkbox" ${state.settings.galleryEnabled ? "checked" : ""}>Let the fandom comment beneath messages</label><small>Every ${state.settings.interval} normal replies · ${state.count} / ${state.settings.interval} counted. No regeneration, swipe or Kazz-reply triggers.</small><div class="row field"><button class="primary generate" data-mutate ${state.settings.galleryEnabled ? "" : "hidden"}>Fresh drama</button><button class="gallery-settings">Configure</button></div><label>Saved pages<select class="pages"><option value="">${state.pages.length ? "Choose a page…" : "No pages yet"}</option>${[...state.pages].reverse().map((p) => `<option value="${escapeHTML(p.id)}" ${p.id === pageId ? "selected" : ""}>${escapeHTML(p.title)}</option>`).join("")}</select></label>${page ? '<div class="phone"><div class="island"></div><div class="phone-label"><span>KAZZNET / LOCAL FEED</span><span>● FICTIONAL</span></div><div class="screen"></div><div class="phone-bottom"></div></div>' : `<div class="gallery-empty"><img class="off-duty" src="${kazz_wink_default}" alt="Kazz lounging off duty"><p>The internet in your pocket is suspiciously quiet.</p><small>Enable the fandom and tap Fresh drama.</small></div>`}`;
     body.querySelector(".enabled").addEventListener("change", (ev) => {
       const galleryEnabled = ev.target.checked;
       run("settings", { settings: { ...state.settings, galleryEnabled } }, galleryEnabled ? "The fandom is awake." : "Peanut Gallery paused. Saved pages remain.");

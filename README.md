@@ -12,25 +12,25 @@ A chat-bound companion extension for Lumiverse, built around Kazz: a foul-mouthe
 - Peanut Gallery is opt-in and produces interactive fictional pages at a configurable message interval.
 - The user chooses Kazz's model connection; working state follows the active chat.
 
-## Alpha · 0.3.0
+## Alpha · 0.4.0
 
 The implementation and prebuilt bundles are included. The UI is a transparent collage: Kazz, a speech bubble, crooked action tiles and input strips float directly over the chat. Work tools have their own readable surfaces; no outer panel encloses the companion. Automated tests cover the backend and real frontend handlers; the shipped frontend is also checked in a browser preview with sample data. Live model response quality and physical mobile-device behavior still need validation. See [verification](docs/VERIFICATION.md) for exact checks and remaining limits.
 
-Kazz floats in the active chat. Tap him or the input-bar KazzWare action to open the menu. On desktop, drag the mascot or the KAZZWARE label. On narrow screens, the composition uses a transparent fullscreen surface with a scrollable body. The curled Kazz illustration is the launcher; opening the menu hides it while the larger companion is on screen. The four new supplied poses appear in the launcher, home, chat and idle Gallery.
+Kazz floats in the active chat. Tap him or the input-bar KazzWare action to open the menu. The menu is 80% of its previous scale. On desktop and phones, drag the mascot freely; drag the open menu by the KAZZWARE label or its large Kazz artwork. The title and launcher also accept arrow keys (Shift for larger steps). The menu remains a floating, scrollable surface on narrow screens. The curled Kazz illustration is the launcher; opening the menu hides it while the larger companion is on screen. The four new supplied poses appear in the launcher, home, chat and idle Gallery.
 
 | Section | What it does |
 | --- | --- |
-| Editor | **Follow view** selects the mounted message nearest the middle of the visible chat after scrolling settles. **Pick from chat** hides the controls so you can tap a native message; Escape or Cancel pick returns without changing it. A manual pick, source selection or edit direction pins the target. Enter a direction, then **Edit now**. Successful edits apply immediately. |
-| Selection editing | Select source text in the editor, or highlight chat text and send that message to Kazz. Ambiguous rendered highlights fall back to selecting the exact source. Only that source range is replaced. |
+| Editor | **Follow view** selects the mounted message nearest the middle of the visible chat after scrolling settles. **Pick from chat** hides the controls so you can tap a native message; Escape or Cancel pick returns without changing it. A manual pick, native highlight or edit direction pins the target. Enter a direction, then **Edit now**. Successful edits apply immediately. |
+| Selection editing | Highlight prose directly in a native message, even with the menu closed. A small prompt offers a direction field, **Edit selection**, **More options**, and Close. Quick edits expose Undo immediately. More options carries the highlight and direction into Editor. No duplicated source box or message dropdown. Ambiguous or formatting-altered highlights are rejected; select a smaller plain-text passage. They never become whole-message edits. |
 | De-slop | Save a literal phrase list, choose whole-word boundaries, scan, and rewrite coherently. A result containing banned wording is rejected. |
 | Chat | A separate per-chat conversation. Search all messages, read older messages, inspect app reference data, request edits, summaries, or a lorebook. |
-| Gallery | Opt in, choose an interval and forum/thread/wiki format. Generate fictional fandom pages, like posts, and leave persistent comments. |
+| Gallery | Opt in, choose an interval and forum/thread/wiki format. Each saved page gets a collapsible entry beneath its triggering native message. Open it there, like posts, and leave persistent comments without opening the menu. The Gallery tab keeps the saved-page archive; pausing hides inline entries while preserving the archive. |
 | Notebook | Create rolling full-chat summaries and lorebooks. New lorebooks are attached only to the current chat. |
 | Settings | Pick Kazz's saved connection, working-context length, gallery settings and mascot size. Settings are per chat. |
 
-The current edit target is named in the menu and outlined in the native chat. Following runs while Kazz is open; it does not scroll the chat or select unloaded history. Click the pinned toggle to resume following (this clears the old direction/range), or use the recent-message list and native **Send to Kazz** action. A generation in progress cannot switch targets.
+The current edit target is named in the menu and outlined in the native chat. Following runs while Kazz is open; it does not scroll the chat or select unloaded history. Click the pinned toggle to resume following (this clears the old direction/range), or use the native **Send to Kazz** action. A generation in progress cannot switch targets.
 
-Undo is in Editor and retains the latest 20 Kazz message edits across reloads. It checks the message and active swipe before restoring anything. A manual change made afterward blocks Undo so it cannot overwrite your newer wording. A write-ahead recovery record is saved before every edit. Lorebook creation is managed through Lumiverse's lorebook editor, not the message Undo journal.
+Quick selection edits show an Undo button in their prompt; the full history is in Editor and retains the latest 20 Kazz message edits across reloads. It checks the message and active swipe before restoring anything. A manual change made afterward blocks Undo so it cannot overwrite your newer wording. A write-ahead recovery record is saved before every edit. Lorebook creation is managed through Lumiverse's lorebook editor, not the message Undo journal.
 
 ## Install
 
@@ -42,7 +42,7 @@ Requires **Lumiverse 1.2.5+**, its required **Bun 1.4.4+** runtime, and a config
 
 Open a chat, open KazzWare → Settings, select a connection and save. Peanut Gallery starts disabled. Message editing, summary creation and gallery generation spend tokens through your selected provider; long summaries may use several calls.
 
-**Updating:** once 0.3.0 is on your installed branch, update KazzWare in the extension manager and refresh the Lumiverse browser page. Confirm its card shows **0.3.0**, then open a chat. You do not need to reinstall the extension or reset its data. The HTTP startup fix from 0.1.1 is included.
+**Updating:** once 0.4.0 is on your installed branch, update KazzWare in the extension manager and refresh the Lumiverse browser page. Confirm its card shows **0.4.0**, then open a chat. You do not need to reinstall the extension or reset its data. The HTTP startup fix from 0.1.1 is included.
 
 ## Data and scope
 
