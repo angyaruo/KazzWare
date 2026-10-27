@@ -62,3 +62,12 @@ Routine UI replies carry message previews, Undo metadata and gallery page metada
 - [Installer and scanner](https://github.com/prolix-oc/Lumiverse/blob/3d74148383dded2b379f204532cf375b52bcd201/src/spindle/manager.service.ts)
 - [Sandbox implementation](https://github.com/prolix-oc/Lumiverse/blob/3d74148383dded2b379f204532cf375b52bcd201/frontend/src/lib/spindle/sandbox-frame.ts)
 - [Mousey / LumiAgent](https://github.com/AMousePad/LumiAgent), a conceptual reference; no implementation code was copied.
+
+
+## Commentary (0.5.0)
+
+`commentary.ts` owns event subscriptions and a plain-text speech portal anchored to the mascot's rendered bounds. MESSAGE_SENT accepts nonempty saved messages; MESSAGE_SWIPED accepts added/navigated nonempty swipes; GENERATION_ENDED accepts normal/swipe/regenerate/continue/impersonate only. A 160 ms coalescing window and shared pending replies absorb duplicate events. Latest-event epochs, chat binding and opt-in state prevent late bubbles; the menu is never opened. Selecting old swipes already consumed by commentary does not generate again.
+
+The backend `commentary` action uses the selected connection, bounded context through the latest message and a 256-token budget. It checks source/swipe equality before and after the model call. SHA-256 keys of message ID, swipe ID and content are persisted before generation (latest 1000 per chat), so repeated delivery and other tabs cannot charge again, including failures. Existing storage gains `settings.commentaryEnabled = false` and an empty `commented` list. This operation does not write roleplay, assistant turns, Undo or Gallery counters. `cancelCommentary` aborts only commentary controllers; disabling and chat switches invalidate frontend results. A failed event is consumed; a genuinely new message/swipe can trigger again.
+
+`float-position.ts` retains requested drag coordinates independently of legacy host placement reads, preserves them through size/show calls and skips unchanged sizes. Menu opening uses the visible mascot bounds (host UI scale included), then clamps beside it. Native highlight controls now debounce the surface itself and suppress it while a selection pointer is held.

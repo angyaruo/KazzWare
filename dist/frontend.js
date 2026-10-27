@@ -251,6 +251,166 @@ function draggable(handle, widget) {
   } };
 }
 
+// src/float-position.ts
+function positioned(widget, width, height) {
+  let position = widget.getPosition();
+  return {
+    ...widget,
+    getPosition: () => ({ ...position }),
+    moveTo(x, y) {
+      position = { x, y };
+      widget.moveTo(x, y);
+    },
+    setSize(w, h) {
+      if (width === w && height === h)
+        return;
+      width = w;
+      height = h;
+      widget.setSize(w, h);
+      widget.moveTo(position.x, position.y);
+    },
+    setVisible(visible) {
+      widget.setVisible(visible);
+      if (visible)
+        widget.moveTo(position.x, position.y);
+    }
+  };
+}
+function openBeside(mascot, panel, width, height, mascotSize) {
+  const saved = mascot.getPosition(), rect = mascot.root.getBoundingClientRect();
+  const scale = mascot.root.offsetWidth && rect.width ? rect.width / mascot.root.offsetWidth : 1;
+  const p = rect.width && rect.height ? { x: rect.left / scale, y: rect.top / scale } : saved;
+  mascot.moveTo(p.x, p.y);
+  const viewport = window.visualViewport;
+  const left = (viewport?.offsetLeft || 0) / scale + 8, top = (viewport?.offsetTop || 0) / scale + 8;
+  const right = ((viewport?.offsetLeft || 0) + (viewport?.width || window.innerWidth)) / scale - 8;
+  const bottom = ((viewport?.offsetTop || 0) + (viewport?.height || window.innerHeight)) / scale - 8;
+  const x = p.x + mascotSize + width + 12 <= right ? p.x + mascotSize + 12 : p.x - width - 12;
+  panel.moveTo(Math.max(left, Math.min(x, right - width)), Math.max(top, Math.min(p.y, bottom - height)));
+}
+
+// src/commentary.ts
+function commentary(ctx, anchor, options) {
+  const portal = ctx.dom.createElement("div");
+  portal.dataset.kazzwareOwned = "commentary";
+  portal.hidden = true;
+  Object.assign(portal.style, { position: "fixed", zIndex: "2147482900", width: "min(280px, calc(100vw - 16px))", pointerEvents: "auto" });
+  document.body.append(portal);
+  const root = portal.attachShadow({ mode: "open" });
+  root.innerHTML = `<style>:host{font:600 14px/1.45 system-ui;color:#11171c}*{box-sizing:border-box}.speech{position:relative;padding:12px 35px 12px 14px;background:#eeeede;border:2px solid #11171c;box-shadow:4px 4px 0 #ff4b57;overflow-wrap:anywhere}.speech:after{content:'';position:absolute;bottom:-10px;left:var(--tail,24px);width:16px;height:16px;background:#eeeede;border-right:2px solid #11171c;border-bottom:2px solid #11171c;transform:rotate(45deg)}:host([data-below]) .speech:after{bottom:auto;top:-10px;transform:rotate(225deg)}small{display:block;font:800 10px ui-monospace,monospace;color:#a92035;margin-bottom:5px}button{position:absolute;right:0;top:0;width:32px;height:36px;border:0;background:none;color:#11171c;font-size:22px;cursor:pointer}button:focus-visible{outline:2px solid #a92035;outline-offset:-4px}</style><div class="speech"><small>KAZZ.EXE / UNSOLICITED OPINION</small><span role="status" aria-live="polite"></span><button aria-label="Dismiss Kazz commentary">×</button></div>`;
+  const text = root.querySelector("span");
+  let epoch = 0, timer, expiry, animation = 0, destroyed = false;
+  let line = "", currentKey = "", muted = false;
+  const shown = new Set;
+  const enabled = () => !muted && options.enabled();
+  const replies = new Map;
+  function clear() {
+    clearTimeout(expiry);
+    window.cancelAnimationFrame(animation);
+    line = "";
+    text.textContent = "";
+    portal.hidden = true;
+  }
+  function position() {
+    if (destroyed || !line)
+      return;
+    portal.hidden = !options.visible() || !enabled();
+    if (!portal.hidden) {
+      const rect = anchor.getBoundingClientRect(), viewport = window.visualViewport;
+      const left = viewport?.offsetLeft || 0, top = viewport?.offsetTop || 0, width = viewport?.width || window.innerWidth, height = viewport?.height || window.innerHeight;
+      const box = portal.getBoundingClientRect();
+      const x = Math.max(left + 8, Math.min(rect.left + rect.width / 2 - box.width / 2, left + width - box.width - 8));
+      const below = rect.top - box.height - 16 < top + 8;
+      portal.toggleAttribute("data-below", below);
+      portal.style.left = `${x}px`;
+      portal.style.top = `${Math.max(top + 8, Math.min(below ? rect.bottom + 16 : rect.top - box.height - 16, top + height - box.height - 8))}px`;
+      portal.style.setProperty("--tail", `${Math.max(16, Math.min(rect.left + rect.width / 2 - x - 8, box.width - 32))}px`);
+    }
+    animation = window.requestAnimationFrame(position);
+  }
+  root.querySelector("button").addEventListener("click", clear);
+  function reset() {
+    ++epoch;
+    clearTimeout(timer);
+    timer = undefined;
+    clear();
+    currentKey = "";
+    replies.clear();
+    shown.clear();
+    options.rpc("cancelCommentary").catch(() => {});
+  }
+  function queue(messageId) {
+    if (!enabled() || destroyed)
+      return;
+    const request = ++epoch, chat = options.chatId();
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      timer = undefined;
+      const live = () => request === epoch && chat === options.chatId() && enabled() && !destroyed;
+      try {
+        const message = await options.rpc("message", { messageId });
+        if (!live() || !message.content.trim())
+          return;
+        const key = JSON.stringify([message.id, message.swipe_id, message.content]);
+        if (currentKey !== key) {
+          clear();
+          currentKey = key;
+        }
+        let pending = replies.get(key);
+        if (!pending) {
+          pending = options.rpc("commentary", { messageId, expected: message.content, swipe: message.swipe_id });
+          replies.set(key, pending);
+          if (replies.size > 100)
+            replies.delete(replies.keys().next().value);
+        }
+        const result = await pending;
+        if (!live() || !result || shown.has(key))
+          return;
+        shown.add(key);
+        if (shown.size > 100)
+          shown.delete(shown.values().next().value);
+        line = result;
+        text.textContent = line;
+        position();
+        expiry = setTimeout(clear, 14000);
+      } catch (error) {
+        if (live())
+          options.error(`Commentary: ${error.message}`);
+      }
+    }, 160);
+  }
+  const off = [
+    ctx.events.on("MESSAGE_SENT", (payload) => {
+      const event = payload;
+      if (event.chatId === options.chatId() && event.message?.content.trim())
+        queue(event.message.id);
+    }),
+    ctx.events.on("MESSAGE_SWIPED", (payload) => {
+      const event = payload;
+      if (event.chatId === options.chatId() && ["added", "navigated"].includes(event.action || "") && event.message?.content.trim())
+        queue(event.message.id);
+    }),
+    ctx.events.on("GENERATION_ENDED", (payload) => {
+      const event = payload;
+      if (event.chatId === options.chatId() && event.messageId && !event.error && ["normal", "swipe", "regenerate", "continue", "impersonate"].includes(event.generationType || "normal"))
+        queue(event.messageId);
+    })
+  ];
+  return { reset, pause() {
+    muted = true;
+    reset();
+  }, sync() {
+    muted = !options.enabled();
+    if (muted && (line || replies.size || timer))
+      reset();
+  }, destroy() {
+    destroyed = true;
+    reset();
+    off.forEach((fn) => fn());
+    portal.remove();
+  } };
+}
+
 // src/native-selection.ts
 function readNativeSelection(dom) {
   const selection = window.getSelection();
@@ -309,6 +469,7 @@ function selectionPrompt(dom, options) {
   let sequence = 0, timer, selected;
   let message, range, undoId = "", working = false, dismissed = "";
   let lastAnchor;
+  let pointerHeld = false;
   const signature = (selection) => selection.messageId + "\x00" + selection.text;
   const say = (text, error = false) => {
     feedback.textContent = text;
@@ -376,25 +537,23 @@ function selectionPrompt(dom, options) {
     portal.hidden = false;
     position();
     const request = sequence;
-    timer = setTimeout(() => {
-      options.load(next.messageId).then((value) => {
-        if (request !== sequence || !options.available())
-          return;
-        message = value;
-        range = nativeRange(value.content, next.text);
-        if (!range) {
-          say("Cannot match this highlight uniquely. Select a smaller plain-text passage in the message.", true);
-          return;
-        }
-        more.disabled = false;
-        apply.disabled = !input.value.trim();
-        say(`Only this passage · ${range.end - range.start} characters`);
-        position();
-      }).catch((error) => {
-        if (request === sequence)
-          say(error.message, true);
-      });
-    }, 160);
+    options.load(next.messageId).then((value) => {
+      if (request !== sequence || !options.available())
+        return;
+      message = value;
+      range = nativeRange(value.content, next.text);
+      if (!range) {
+        say("Cannot match this highlight uniquely. Select a smaller plain-text passage in the message.", true);
+        return;
+      }
+      more.disabled = false;
+      apply.disabled = !input.value.trim();
+      say(`Only this passage · ${range.end - range.start} characters`);
+      position();
+    }).catch((error) => {
+      if (request === sequence)
+        say(error.message, true);
+    });
   }
   input.addEventListener("input", () => {
     apply.disabled = working || !range || !input.value.trim();
@@ -452,12 +611,33 @@ function selectionPrompt(dom, options) {
       close();
     }
   };
-  const outside = (event) => {
-    if (!portal.hidden && !event.composedPath().includes(portal))
+  const schedule = () => {
+    clearTimeout(timer);
+    if (pointerHeld || working || document.activeElement === portal)
+      return;
+    const next = readNativeSelection(dom);
+    if (selected && (!next || signature(next) !== signature(selected)))
       close();
+    timer = setTimeout(capture, 160);
   };
-  document.addEventListener("selectionchange", capture);
-  document.addEventListener("pointerup", capture);
+  const outside = (event) => {
+    if (event.composedPath().includes(portal))
+      return;
+    pointerHeld = true;
+    close();
+  };
+  const release = () => {
+    pointerHeld = false;
+    schedule();
+  };
+  const cancel = () => {
+    pointerHeld = false;
+    close();
+  };
+  document.addEventListener("selectionchange", schedule);
+  window.addEventListener("pointerup", release, true);
+  window.addEventListener("pointercancel", cancel, true);
+  window.addEventListener("blur", cancel);
   document.addEventListener("pointerdown", outside, true);
   document.addEventListener("keydown", escape, true);
   document.addEventListener("scroll", position, true);
@@ -465,13 +645,16 @@ function selectionPrompt(dom, options) {
   window.visualViewport?.addEventListener("resize", position);
   window.visualViewport?.addEventListener("scroll", position);
   return { close, reset() {
+    pointerHeld = false;
     close();
     dismissed = "";
   }, destroy() {
     close();
     portal.remove();
-    document.removeEventListener("selectionchange", capture);
-    document.removeEventListener("pointerup", capture);
+    document.removeEventListener("selectionchange", schedule);
+    window.removeEventListener("pointerup", release, true);
+    window.removeEventListener("pointercancel", cancel, true);
+    window.removeEventListener("blur", cancel);
     document.removeEventListener("pointerdown", outside, true);
     document.removeEventListener("keydown", escape, true);
     document.removeEventListener("scroll", position, true);
@@ -627,8 +810,9 @@ function setup(ctx) {
   let error = false;
   let busy = 0;
   const pending = new Map;
-  const mascot = ctx.ui.createFloatWidget({ width: 110, height: 110, initialPosition: { x: Math.max(0, window.innerWidth - 125), y: Math.max(0, window.innerHeight - 245) }, snapToEdge: false, chromeless: true, touchScrollMode: "native", tooltip: "KazzWare · your in-chat accomplice" });
-  const panel = ctx.ui.createFloatWidget({ width: Math.min(416, (window.innerWidth - 16) * 0.8), height: Math.min(688, (window.innerHeight - 24) * 0.8), initialPosition: { x: Math.max(8, window.innerWidth - 436), y: 12 }, snapToEdge: false, chromeless: true, touchScrollMode: "native", tooltip: "KazzWare" });
+  const mascot = positioned(ctx.ui.createFloatWidget({ width: 110, height: 110, initialPosition: { x: Math.max(0, window.innerWidth - 125), y: Math.max(0, window.innerHeight - 245) }, snapToEdge: false, chromeless: true, touchScrollMode: "native", tooltip: "KazzWare · your in-chat accomplice" }), 110, 110);
+  let panelWidth = Math.min(416, (window.innerWidth - 16) * 0.8), panelHeight = Math.min(688, (window.innerHeight - 24) * 0.8);
+  const panel = positioned(ctx.ui.createFloatWidget({ width: panelWidth, height: panelHeight, initialPosition: { x: Math.max(8, window.innerWidth - 436), y: 12 }, snapToEdge: false, chromeless: true, touchScrollMode: "native", tooltip: "KazzWare" }), panelWidth, panelHeight);
   for (const widget of [mascot, panel]) {
     widget.root.style.width = "100%";
     widget.root.style.height = "100%";
@@ -707,6 +891,8 @@ function setup(ctx) {
     reply.ok ? request.resolve(reply.result) : request.reject(new Error(reply.error || "KazzWare request failed."));
   }));
   async function run(action, data = {}, success = "Done. Your changes are saved.") {
+    if (action === "settings" && !data.settings?.commentaryEnabled)
+      chatter.pause();
     const origin = binding;
     busy++;
     paintStatus();
@@ -770,6 +956,8 @@ function setup(ctx) {
   function show(next = tab) {
     const changed = next !== tab;
     stopPicking();
+    if (!opened)
+      openBeside(mascot, panel, panelWidth, panelHeight, view?.state.settings.mascotSize || 110);
     opened = true;
     tab = next;
     panel.setVisible(!!chatId);
@@ -1034,6 +1222,8 @@ function setup(ctx) {
     inline.sync(view?.state.pages || [], !!view?.state.settings.galleryEnabled && !!chatId);
   }
   disposers.push(() => inline.clear());
+  const chatter = commentary(ctx, mascot.root, { enabled: () => !!view?.state.settings.commentaryEnabled && !!chatId, chatId: () => chatId, visible: () => !!chatId && !opened, rpc, error: (text) => notify(text, true) });
+  disposers.push(() => chatter.destroy());
   const prompt = selectionPrompt(ctx.dom, {
     available: () => !!chatId && !!view && !busy && !destroyed && !picking,
     load: (id) => rpc("message", { messageId: id }),
@@ -1062,6 +1252,8 @@ function setup(ctx) {
     panel.setFullscreen(false);
     const width = Math.min(416, (window.innerWidth - 16) * 0.8);
     const height = Math.max(160, Math.min(688, ((window.visualViewport?.height || window.innerHeight) - 24) * 0.8));
+    panelWidth = width;
+    panelHeight = height;
     panel.setSize(width, height);
     const pos = panel.getPosition();
     panel.moveTo(Math.max(8, Math.min(pos.x, window.innerWidth - width - 8)), Math.max(8, Math.min(pos.y, (window.visualViewport?.height || window.innerHeight) - height - 8)));
@@ -1082,15 +1274,16 @@ function setup(ctx) {
     const next = value && typeof value === "object" && "chatId" in value ? value.chatId : null;
     if (next === chatId && view)
       return;
+    prompt.reset();
+    chatter.reset();
+    inline.clear();
+    petDrag.cancel();
+    panelDrag.cancel();
     for (const item of pending.values()) {
       clearTimeout(item.timer);
       item.reject(new Error("Chat changed."));
     }
     pending.clear();
-    prompt.reset();
-    inline.clear();
-    petDrag.cancel();
-    panelDrag.cancel();
     stopPicking();
     following = true;
     invalidateSelection();
@@ -1136,6 +1329,7 @@ function setup(ctx) {
       drag.destroy();
     artDrags = [];
     syncGallery();
+    chatter.sync();
     frame?.destroy();
     frame = undefined;
     markTarget();
@@ -1323,8 +1517,8 @@ function setup(ctx) {
   }
   function renderSettings() {
     const s = settingsDraft || view.state.settings;
-    body.innerHTML = `${heading("06 / SETTINGS", "Under the hood", "HANDLE WITH CARE")}<p class="muted">Saved separately for each chat.</p><label class="field">Kazz’s connection<select class="connection"><option value="">Choose a connection…</option>${view.connections.map((c) => `<option value="${escapeHTML(c.id)}" ${c.id === s.connectionId ? "selected" : ""}>${escapeHTML(c.name)} · ${escapeHTML(c.model)}</option>`).join("")}</select></label><small>Uses this saved connection for every Kazz request. Your roleplay connection stays as it is.</small><label class="field">Recent messages in working context (5–100)<input class="context" type="number" min="5" max="100" value="${s.contextMessages}"></label><label class="field">Gallery interval (normal replies)<input class="interval" type="number" min="1" max="100" value="${s.interval}"></label><label class="field">Gallery format<select class="format">${[["random", "Surprise me"], ["forum", "AITA / discussion forum"], ["thread", "Fandom social thread"], ["wiki", "Unofficial wiki"]].map(([key, label]) => `<option value="${key}" ${key === s.format ? "selected" : ""}>${label}</option>`).join("")}</select></label><label class="field">Mascot size<input class="size" type="range" min="70" max="180" value="${s.mascotSize}"></label><div class="row"><button class="primary save-settings" data-mutate>Save settings</button><button class="reload-state">Reload</button></div><div class="note">Context goes to the connection you select. Search can inspect older messages; summaries read the whole chat. Kazz never receives connection API keys.</div>`;
-    const read = () => ({ ...view.state.settings, connectionId: body.querySelector(".connection").value, contextMessages: Number(body.querySelector(".context").value), interval: Number(body.querySelector(".interval").value), format: body.querySelector(".format").value, mascotSize: Number(body.querySelector(".size").value) });
+    body.innerHTML = `${heading("06 / SETTINGS", "Under the hood", "HANDLE WITH CARE")}<p class="muted">Saved separately for each chat.</p><label class="field">Kazz’s connection<select class="connection"><option value="">Choose a connection…</option>${view.connections.map((c) => `<option value="${escapeHTML(c.id)}" ${c.id === s.connectionId ? "selected" : ""}>${escapeHTML(c.name)} · ${escapeHTML(c.model)}</option>`).join("")}</select></label><small>Uses this saved connection for every Kazz request. Your roleplay connection stays as it is.</small><label class="check"><input class="commentary-enabled" type="checkbox" ${s.commentaryEnabled ? "checked" : ""}>Let Kazz comment from his widget</label><small>One short aside per new message or unseen swipe, using this connection. Off by default; never adds to the chat. Bubbles fade after 14 seconds or can be dismissed.</small><label class="field">Recent messages in working context (5–100)<input class="context" type="number" min="5" max="100" value="${s.contextMessages}"></label><label class="field">Gallery interval (normal replies)<input class="interval" type="number" min="1" max="100" value="${s.interval}"></label><label class="field">Gallery format<select class="format">${[["random", "Surprise me"], ["forum", "AITA / discussion forum"], ["thread", "Fandom social thread"], ["wiki", "Unofficial wiki"]].map(([key, label]) => `<option value="${key}" ${key === s.format ? "selected" : ""}>${label}</option>`).join("")}</select></label><label class="field">Mascot size<input class="size" type="range" min="70" max="180" value="${s.mascotSize}"></label><div class="row"><button class="primary save-settings" data-mutate>Save settings</button><button class="reload-state">Reload</button></div><div class="note">Context goes to the connection you select. Search can inspect older messages; summaries read the whole chat. Kazz never receives connection API keys.</div>`;
+    const read = () => ({ ...view.state.settings, commentaryEnabled: body.querySelector(".commentary-enabled").checked, connectionId: body.querySelector(".connection").value, contextMessages: Number(body.querySelector(".context").value), interval: Number(body.querySelector(".interval").value), format: body.querySelector(".format").value, mascotSize: Number(body.querySelector(".size").value) });
     body.querySelectorAll("input,select").forEach((input) => input.addEventListener("input", () => {
       settingsDraft = read();
     }));

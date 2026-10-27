@@ -9,6 +9,8 @@ import { CSS } from './style';
 import { FONT_CSS } from './fonts';
 import { messageInView } from './message-targeting';
 import { draggable } from './drag';
+import { positioned, openBeside } from './float-position';
+import { commentary } from './commentary';
 import { nativeRange } from './native-selection';
 import { selectionPrompt } from './selection-prompt';
 import { inlineGallery } from './inline-gallery';
@@ -42,8 +44,9 @@ export function setup(ctx: SpindleFrontendContext): () => void {
   let direction = ''; let askDraft = ''; let slopDraft: string | undefined; let settingsDraft: Settings | undefined;
   let pageId = ''; let frame: SpindleSandboxFrameHandle | undefined; let status = 'Open a chat to wake Kazz.'; let error = false; let busy = 0;
   const pending = new Map<string, { resolve: (result: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
-  const mascot = ctx.ui.createFloatWidget({ width: 110, height: 110, initialPosition: { x: Math.max(0, window.innerWidth - 125), y: Math.max(0, window.innerHeight - 245) }, snapToEdge: false, chromeless: true, touchScrollMode: 'native', tooltip: 'KazzWare · your in-chat accomplice' });
-  const panel = ctx.ui.createFloatWidget({ width: Math.min(416, (window.innerWidth - 16) * .8), height: Math.min(688, (window.innerHeight - 24) * .8), initialPosition: { x: Math.max(8, window.innerWidth - 436), y: 12 }, snapToEdge: false, chromeless: true, touchScrollMode: 'native', tooltip: 'KazzWare' });
+  const mascot = positioned(ctx.ui.createFloatWidget({ width: 110, height: 110, initialPosition: { x: Math.max(0, window.innerWidth - 125), y: Math.max(0, window.innerHeight - 245) }, snapToEdge: false, chromeless: true, touchScrollMode: 'native', tooltip: 'KazzWare · your in-chat accomplice' }), 110, 110);
+  let panelWidth = Math.min(416, (window.innerWidth - 16) * .8), panelHeight = Math.min(688, (window.innerHeight - 24) * .8);
+  const panel = positioned(ctx.ui.createFloatWidget({ width: panelWidth, height: panelHeight, initialPosition: { x: Math.max(8, window.innerWidth - 436), y: 12 }, snapToEdge: false, chromeless: true, touchScrollMode: 'native', tooltip: 'KazzWare' }), panelWidth, panelHeight);
   for (const widget of [mascot, panel]) { widget.root.style.width = '100%'; widget.root.style.height = '100%'; }
   panel.root.dataset.kazzwareSurface = '';
   panel.root.style.pointerEvents = 'none';
@@ -88,6 +91,7 @@ export function setup(ctx: SpindleFrontendContext): () => void {
     reply.ok ? request.resolve(reply.result) : request.reject(new Error(reply.error || 'KazzWare request failed.'));
   }));
   async function run(action: string, data: Record<string, unknown> = {}, success = 'Done. Your changes are saved.') {
+    if (action === 'settings' && !(data.settings as Settings)?.commentaryEnabled) chatter.pause();
     const origin = binding; busy++; paintStatus(); notify('Working…');
     try {
       const result = await rpc<View | null>(action, data);
@@ -116,7 +120,7 @@ export function setup(ctx: SpindleFrontendContext): () => void {
     }
     catch { if (origin === binding && target?.id === id) { target = undefined; range = undefined; } }
   }
-  function show(next: Tab = tab) { const changed = next !== tab; stopPicking(); opened = true; tab = next; panel.setVisible(!!chatId); render(); if (changed) body.scrollTop = 0; scheduleFollow(); }
+  function show(next: Tab = tab) { const changed = next !== tab; stopPicking(); if (!opened) openBeside(mascot, panel, panelWidth, panelHeight, view?.state.settings.mascotSize || 110); opened = true; tab = next; panel.setVisible(!!chatId); render(); if (changed) body.scrollTop = 0; scheduleFollow(); }
   function hide() { panelDrag.cancel(); for (const drag of artDrags) drag.cancel(); stopPicking(); opened = false; invalidateSelection(); clearTimeout(followTimer); markTarget(); panel.setVisible(false); paintStatus(); petButton.focus(); }
   petButton.addEventListener('click', () => opened ? hide() : show());
   root.querySelector('.close')!.addEventListener('click', hide);
@@ -232,6 +236,8 @@ export function setup(ctx: SpindleFrontendContext): () => void {
   });
   function syncGallery() { inline.sync(view?.state.pages || [], !!view?.state.settings.galleryEnabled && !!chatId); }
   disposers.push(() => inline.clear());
+  const chatter = commentary(ctx, mascot.root, { enabled: () => !!view?.state.settings.commentaryEnabled && !!chatId, chatId: () => chatId, visible: () => !!chatId && !opened, rpc, error: text => notify(text, true) });
+  disposers.push(() => chatter.destroy());
   const prompt = selectionPrompt(ctx.dom, {
     available: () => !!chatId && !!view && !busy && !destroyed && !picking,
     load: id => rpc<Message>('message', { messageId: id }), pin: pinTarget,
@@ -252,7 +258,7 @@ export function setup(ctx: SpindleFrontendContext): () => void {
     panel.setFullscreen(false);
     const width = Math.min(416, (window.innerWidth - 16) * .8);
     const height = Math.max(160, Math.min(688, ((window.visualViewport?.height || window.innerHeight) - 24) * .8));
-    panel.setSize(width, height);
+    panelWidth = width; panelHeight = height; panel.setSize(width, height);
     const pos = panel.getPosition();
     panel.moveTo(Math.max(8, Math.min(pos.x, window.innerWidth - width - 8)), Math.max(8, Math.min(pos.y, (window.visualViewport?.height || window.innerHeight) - height - 8)));
     scheduleFollow();
@@ -263,8 +269,8 @@ export function setup(ctx: SpindleFrontendContext): () => void {
   function changeChat(value: unknown) {
     const next = value && typeof value === 'object' && 'chatId' in value ? (value as { chatId: string | null }).chatId : null;
     if (next === chatId && view) return;
+    prompt.reset(); chatter.reset(); inline.clear(); petDrag.cancel(); panelDrag.cancel();
     for (const item of pending.values()) { clearTimeout(item.timer); item.reject(new Error('Chat changed.')); } pending.clear();
-    prompt.reset(); inline.clear(); petDrag.cancel(); panelDrag.cancel();
     stopPicking(); following = true; invalidateSelection(); clearTimeout(followTimer);
     binding = randomId(); chatId = next; view = undefined; target = undefined; range = undefined; direction = ''; askDraft = ''; slopDraft = undefined; settingsDraft = undefined; pageId = ''; busy = 0;
     frame?.destroy(); frame = undefined; mascot.setVisible(!!chatId); panel.setVisible(!!chatId && opened); inputAction.setEnabled(!!chatId);
@@ -280,7 +286,7 @@ export function setup(ctx: SpindleFrontendContext): () => void {
   function heading(code: string, title: string, tag: string) { return `<div class="section-head"><div class="eyebrow">${code}</div><h2>${title}</h2><span class="badge">${tag}</span></div>`; }
   function render() {
     for (const drag of artDrags) drag.destroy(); artDrags = [];
-    syncGallery();
+    syncGallery(); chatter.sync();
     frame?.destroy(); frame = undefined;
     markTarget();
     root.querySelector<HTMLElement>('.shell')!.dataset.screen = tab;
@@ -364,8 +370,8 @@ export function setup(ctx: SpindleFrontendContext): () => void {
   }
   function renderSettings() {
     const s = settingsDraft || view!.state.settings;
-    body.innerHTML = `${heading('06 / SETTINGS', 'Under the hood', 'HANDLE WITH CARE')}<p class="muted">Saved separately for each chat.</p><label class="field">Kazz’s connection<select class="connection"><option value="">Choose a connection…</option>${view!.connections.map(c => `<option value="${e(c.id)}" ${c.id === s.connectionId ? 'selected' : ''}>${e(c.name)} · ${e(c.model)}</option>`).join('')}</select></label><small>Uses this saved connection for every Kazz request. Your roleplay connection stays as it is.</small><label class="field">Recent messages in working context (5–100)<input class="context" type="number" min="5" max="100" value="${s.contextMessages}"></label><label class="field">Gallery interval (normal replies)<input class="interval" type="number" min="1" max="100" value="${s.interval}"></label><label class="field">Gallery format<select class="format">${[['random', 'Surprise me'], ['forum', 'AITA / discussion forum'], ['thread', 'Fandom social thread'], ['wiki', 'Unofficial wiki']].map(([key, label]) => `<option value="${key}" ${key === s.format ? 'selected' : ''}>${label}</option>`).join('')}</select></label><label class="field">Mascot size<input class="size" type="range" min="70" max="180" value="${s.mascotSize}"></label><div class="row"><button class="primary save-settings" data-mutate>Save settings</button><button class="reload-state">Reload</button></div><div class="note">Context goes to the connection you select. Search can inspect older messages; summaries read the whole chat. Kazz never receives connection API keys.</div>`;
-    const read = (): Settings => ({ ...view!.state.settings, connectionId: body.querySelector<HTMLSelectElement>('.connection')!.value, contextMessages: Number(body.querySelector<HTMLInputElement>('.context')!.value), interval: Number(body.querySelector<HTMLInputElement>('.interval')!.value), format: body.querySelector<HTMLSelectElement>('.format')!.value as Settings['format'], mascotSize: Number(body.querySelector<HTMLInputElement>('.size')!.value) });
+    body.innerHTML = `${heading('06 / SETTINGS', 'Under the hood', 'HANDLE WITH CARE')}<p class="muted">Saved separately for each chat.</p><label class="field">Kazz’s connection<select class="connection"><option value="">Choose a connection…</option>${view!.connections.map(c => `<option value="${e(c.id)}" ${c.id === s.connectionId ? 'selected' : ''}>${e(c.name)} · ${e(c.model)}</option>`).join('')}</select></label><small>Uses this saved connection for every Kazz request. Your roleplay connection stays as it is.</small><label class="check"><input class="commentary-enabled" type="checkbox" ${s.commentaryEnabled ? 'checked' : ''}>Let Kazz comment from his widget</label><small>One short aside per new message or unseen swipe, using this connection. Off by default; never adds to the chat. Bubbles fade after 14 seconds or can be dismissed.</small><label class="field">Recent messages in working context (5–100)<input class="context" type="number" min="5" max="100" value="${s.contextMessages}"></label><label class="field">Gallery interval (normal replies)<input class="interval" type="number" min="1" max="100" value="${s.interval}"></label><label class="field">Gallery format<select class="format">${[['random', 'Surprise me'], ['forum', 'AITA / discussion forum'], ['thread', 'Fandom social thread'], ['wiki', 'Unofficial wiki']].map(([key, label]) => `<option value="${key}" ${key === s.format ? 'selected' : ''}>${label}</option>`).join('')}</select></label><label class="field">Mascot size<input class="size" type="range" min="70" max="180" value="${s.mascotSize}"></label><div class="row"><button class="primary save-settings" data-mutate>Save settings</button><button class="reload-state">Reload</button></div><div class="note">Context goes to the connection you select. Search can inspect older messages; summaries read the whole chat. Kazz never receives connection API keys.</div>`;
+    const read = (): Settings => ({ ...view!.state.settings, commentaryEnabled: body.querySelector<HTMLInputElement>('.commentary-enabled')!.checked, connectionId: body.querySelector<HTMLSelectElement>('.connection')!.value, contextMessages: Number(body.querySelector<HTMLInputElement>('.context')!.value), interval: Number(body.querySelector<HTMLInputElement>('.interval')!.value), format: body.querySelector<HTMLSelectElement>('.format')!.value as Settings['format'], mascotSize: Number(body.querySelector<HTMLInputElement>('.size')!.value) });
     body.querySelectorAll('input,select').forEach(input => input.addEventListener('input', () => { settingsDraft = read(); }));
     button('.save-settings', () => { const next = read(); settingsDraft = undefined; void run('settings', { settings: next }, 'Settings saved for this chat.'); });
     button('.reload-state', () => { settingsDraft = undefined; void run('load', {}, 'Reloaded.'); });

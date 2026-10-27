@@ -1,7 +1,8 @@
 import { afterEach, expect, test } from 'bun:test';
 import { JSDOM } from 'jsdom';
-import type { SpindleDOMHelper } from 'lumiverse-spindle-types';
+import type { SpindleDOMHelper, SpindleFloatWidgetHandle } from 'lumiverse-spindle-types';
 import { draggable } from '../src/drag';
+import { positioned, openBeside } from '../src/float-position';
 import { inlineGallery } from '../src/inline-gallery';
 import { nativeRange, readNativeSelection } from '../src/native-selection';
 import { deferred, until } from './fake';
@@ -89,4 +90,21 @@ test('inline Gallery restores one entry per page, isolates reactions, and retire
   shadow.querySelector<HTMLButtonElement>('.toggle')!.click(); expect(frames[1].destroyed).toBe(true);
   gate = deferred(); shadow.querySelector<HTMLButtonElement>('.toggle')!.click(); gallery.clear(); gate.resolve(); await Promise.resolve();
   expect(retired).toHaveLength(1); expect(document.querySelector('[data-kazzware-owned=gallery]')).toBeNull(); expect(frames).toHaveLength(2);
+});
+
+
+test('owned widget geometry survives stale host coordinates and resize/show resets', () => {
+  browser(); const root = document.createElement('div'); document.body.append(root);
+  let actual = { x: 20, y: 20 }, sizes = 0;
+  const legacy = { root, getPosition: () => ({ x: 20, y: 20 }), moveTo(x: number, y: number) { actual = { x, y }; }, setSize() { sizes++; actual = { x: 20, y: 20 }; }, setVisible() { actual = { x: 20, y: 20 }; } } as unknown as SpindleFloatWidgetHandle;
+  const pet = positioned(legacy, 110, 110);
+  pet.moveTo(400, 300); pet.setSize(110, 110); expect(sizes).toBe(0);
+  pet.setSize(130, 130); expect(actual).toEqual({ x: 400, y: 300 });
+  pet.setVisible(false); pet.setVisible(true); expect(actual).toEqual({ x: 400, y: 300 });
+  expect(pet.getPosition()).toEqual(actual);
+  let menu = { x: 0, y: 0 }; const panel = { moveTo(x: number, y: number) { menu = { x, y }; } } as SpindleFloatWidgetHandle;
+  openBeside(pet, panel, 300, 400, 130); expect(menu).toEqual({ x: 542, y: 300 });
+  pet.moveTo(900, 700); openBeside(pet, panel, 300, 400, 130);
+  expect(menu.x + 300).toBeLessThanOrEqual(window.innerWidth - 8); expect(menu.y + 400).toBeLessThanOrEqual(window.innerHeight - 8);
+  expect(pet.getPosition()).toEqual({ x: 900, y: 700 });
 });

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0 — Selection timing, widget placement and commentary
+
+- Native highlight controls now wait until pointer release and 160 ms of selection stability. Keyboard/mobile handle changes restart the delay; cancelled gestures and chat changes retire pending prompts.
+- Fresh menu openings anchor beside the current mascot position and clamp to the viewport. Retain extension-driven coordinates across host resize/show updates, and skip redundant mascot resizing during menu renders.
+- Add per-chat opt-in commentary in Settings (off for new and existing chats). Completed messages and unseen swipes produce one brief, plain-text Kazz aside beside his closed widget. The bubble follows dragging, dismisses with × and expires after 14 seconds; no menu is opened or roleplay text written.
+- Bound commentary to 18 words / 160 Unicode characters. Check the current message/swipe before and after generation, deduplicate provider calls across host events/tabs, and cancel pending commentary when disabled or changing chat. Quiet calls and Kazz's edits do not recursively trigger commentary.
+- Extend the local preview with a Sample swipe button. No new permissions or dependencies; existing chat state migrates within storage version 1.
+
+
 
 ## 0.4.0 · 2026-10-27
 

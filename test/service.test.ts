@@ -109,3 +109,41 @@ test('automatic fandom anchors and context stop at the triggering message even i
   expect((await work).ok).toBe(true); expect(f.state().pages[0].throughMessage).toBe('m1');
   expect(JSON.stringify(f.modelInputs[0])).not.toContain('FUTURE SPOILER');
 });
+
+
+test('commentary is off for older storage, bounded, deduplicated across clients, and uses the selected connection', async () => {
+  const f = fake(); await f.ready();
+  delete (f.state().settings as { commentaryEnabled?: boolean }).commentaryEnabled;
+  delete (f.state() as { commented?: string[] }).commented;
+  const data = { messageId: 'm1', expected: f.messages.get('chat-a')![0].content, swipe: 0 };
+  expect((await f.request('commentary', data)).result).toBeNull(); expect(f.modelInputs).toHaveLength(0);
+  f.state().settings.commentaryEnabled = true; f.outputs.push('Kazz: "' + 'word '.repeat(60) + '"\nAnother line that must never appear.');
+  const reply = await f.request('commentary', data); expect(reply.ok).toBe(true);
+  const line = reply.result as string; expect(Array.from(line).length).toBeLessThanOrEqual(160); expect(line.split(/\s+/).length).toBeLessThanOrEqual(18); expect(line).not.toContain('\n');
+  expect((f.modelInputs[0] as { connection_id: string }).connection_id).toBe('connection');
+  await f.request('bind', {}, { client: 'client-b', binding: 'binding-b' }, 'alice', 'session-b');
+  expect((await f.request('commentary', data, { client: 'client-b', binding: 'binding-b' }, 'alice', 'session-b')).result).toBeNull();
+  expect(f.modelInputs).toHaveLength(1); expect(f.updates).toHaveLength(0); expect(f.state().turns).toHaveLength(0); expect(f.state().count).toBe(0);
+});
+
+test('commentary rejects stale swipes and discards results when a newer message arrives', async () => {
+  const f = fake(); await f.ready(); f.state().settings.commentaryEnabled = true;
+  const message = f.messages.get('chat-a')![0], data = { messageId: 'm1', expected: message.content, swipe: 0 };
+  expect((await f.request('commentary', { ...data, swipe: 4 })).result).toBeNull(); expect(f.modelInputs).toHaveLength(0);
+  const gate = deferred(); f.setGate(() => gate.promise); f.outputs.push('A stale opinion.');
+  const pending = f.request('commentary', data); await until(() => f.modelInputs.length === 1);
+  f.messages.get('chat-a')!.push({ ...message, id: 'm-new', content: 'New action.', index_in_chat: 1 });
+  gate.resolve(); expect((await pending).result).toBeNull();
+  expect((await f.request('commentary', data)).result).toBeNull(); expect(f.modelInputs).toHaveLength(1);
+});
+
+test('failed commentary events are consumed once and chat changes cancel pending commentary', async () => {
+  const f = fake(); await f.ready(); f.state().settings.commentaryEnabled = true;
+  const message = f.messages.get('chat-a')![0], data = { messageId: 'm1', expected: message.content, swipe: 0 };
+  expect((await f.request('commentary', data)).ok).toBe(false);
+  expect((await f.request('commentary', data)).result).toBeNull(); expect(f.modelInputs).toHaveLength(1);
+  message.swipe_id = 1; message.content = 'Another swipe.';
+  const gate = deferred(); f.setGate(() => gate.promise); f.outputs.push('You should never see this.');
+  const pending = f.request('commentary', { ...data, swipe: 1, expected: message.content }); await until(() => f.modelInputs.length === 2);
+  await f.switchChat('chat-b'); gate.resolve(); expect((await pending).ok).toBe(false); expect(f.updates).toHaveLength(0);
+});
