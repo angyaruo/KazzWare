@@ -411,6 +411,118 @@ function commentary(ctx, anchor, options) {
   } };
 }
 
+// src/story-ui.ts
+var value = (form, selector) => form.querySelector(selector).value;
+var field = (label, name, text, max = 120) => `<label class="field">${label}<input name="${name}" value="${escapeHTML(text)}" maxlength="${max}"></label>`;
+function mountMerger(body, ui) {
+  const container = document.createElement("details");
+  container.className = "merge-drawer";
+  container.innerHTML = `<summary>⤨ Swipe merger <small>STITCH THE BEST BITS</small></summary><p>Keep the originals. Create one new active swipe.</p><button class="load-swipes" data-mutate>Open this message’s swipes</button><div class="swipe-source"></div>`;
+  body.insertBefore(container, body.querySelector("h3"));
+  container.querySelector("button").addEventListener("click", async () => {
+    const target = ui.target();
+    if (!target || ui.busy()) {
+      ui.notify("Pick a message in the native chat first.", true);
+      return;
+    }
+    ui.pin();
+    const load = container.querySelector("button"), source = container.querySelector(".swipe-source");
+    load.disabled = true;
+    try {
+      const snapshot = await ui.rpc("swipes", { messageId: target.id });
+      if (!container.isConnected || ui.target()?.id !== target.id)
+        return;
+      source.innerHTML = `<p>${snapshot.swipes.length} swipes · choose at least two</p><form class="merge-form"><div class="swipe-choices">${snapshot.swipes.map((text, index) => `<label class="swipe-choice"><span><input type="checkbox" name="swipe" value="${index}"> SWIPE ${index + 1}${index === snapshot.active ? " / ACTIVE" : ""}</span><pre>${escapeHTML(text)}</pre></label>`).join("")}</div><label class="field">What should survive the merge?<textarea name="direction" maxlength="8000" placeholder="Keep swipe 1’s dialogue, swipe 3’s ending… Leave blank to let Kazz handle it."></textarea></label><button class="primary merge-now" disabled data-mutate>Merge into a new swipe</button></form>`;
+      const form = source.querySelector("form"), submit = source.querySelector(".merge-now");
+      const indices = () => Array.from(form.querySelectorAll("input:checked")).map((input) => Number(input.value));
+      form.addEventListener("change", () => {
+        submit.disabled = indices().length < 2 || ui.busy();
+      });
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        if (ui.busy() || indices().length < 2)
+          return;
+        if (ui.target()?.id !== snapshot.messageId) {
+          ui.notify("The target changed. Open its swipes again.", true);
+          return;
+        }
+        ui.run("mergeSwipes", { messageId: snapshot.messageId, revision: snapshot.revision, indices: indices(), direction: value(form, "[name=direction]") }, "Merged into a new swipe. Originals preserved; Undo is below.");
+      });
+    } catch (error) {
+      ui.notify(error.message, true);
+    } finally {
+      load.disabled = false;
+    }
+  });
+  const records = ui.view().state.story.merges.filter((m) => m.status !== "undone");
+  if (records.length) {
+    const history = document.createElement("div");
+    history.className = "merge-history";
+    history.innerHTML = `<h3>Swipe merge Undo</h3>${[...records].reverse().map((m) => `<button data-merge-undo="${escapeHTML(m.id)}" data-mutate>Undo merge · ${new Date(m.createdAt).toLocaleString()}</button>`).join("")}`;
+    history.querySelectorAll("button").forEach((button) => button.addEventListener("click", () => {
+      ui.run("undoMerge", { id: button.dataset.mergeUndo }, "Merge undone. Original swipes and selection restored.");
+    }));
+    body.append(history);
+  }
+}
+function renderTimeline(body, ui, shown, more) {
+  const { story, settings } = ui.view().state, entries = story.timeline.slice(-shown);
+  body.innerHTML = `<div class="section-head"><div class="eyebrow">07 / MEMORY FRAGMENTS</div><h2>Summary+</h2><span class="badge">THE CANON / THE MAYBE</span></div><p class="muted">One message. Two short lines. Dates and times belong to the story; unknown stays unknown.</p><div class="timeline-switches"><label class="check"><input class="timeline-auto" type="checkbox" data-mutate ${settings.timelineAuto ? "checked" : ""}>Summarize new messages automatically</label><label class="check"><input class="timeline-inject" type="checkbox" data-mutate ${settings.timelineInject ? "checked" : ""}>Include current timeline notes in the roleplay prompt</label><small>Prompt injection requires Lumiverse’s Interceptor permission. Stale notes are excluded.</small></div><div class="row field"><button class="primary summarize-one" data-mutate>Summarize selected message</button><button class="fill-timeline" data-mutate>Fill next 10 gaps</button></div><small>Uses Kazz’s selected connection. Each summary is a separate model call. ${story.timeline.length} / 500 saved.</small><div class="memory-timeline">${story.timeline.length > shown ? '<button class="older-notes">↑ Earlier fragments</button>' : ""}${entries.map((entry, index) => `<article class="memory-node ${entry.stale ? "stale" : ""}" style="--node:${index % 4}"><div class="memory-date"><span>${escapeHTML(entry.storyDate || "DATE UNKNOWN")}</span><time>${escapeHTML(entry.storyTime || "TIME UNKNOWN")}</time></div><details><summary><span class="memory-summary">${escapeHTML(entry.summary)}</span><span class="memory-meta">${escapeHTML([entry.location, entry.characters].filter(Boolean).join(" · ") || "No extra scene facts")}${entry.stale ? " · SOURCE CHANGED" : entry.manual ? " · EDITED" : ""}</span></summary><p class="muted">Swipe ${entry.swipe + 1} · ${entry.stale ? "Refresh the summary from the current source before it can be injected." : "Current source matched."}</p><form data-entry="${escapeHTML(entry.id)}"><label class="field">Summary (up to two lines)<textarea name="summary" maxlength="300" rows="2">${escapeHTML(entry.summary)}</textarea></label><div class="story-fields">${field("In-story date", "storyDate", entry.storyDate, 80)}${field("In-story time", "storyTime", entry.storyTime, 80)}</div>${field("Place", "location", entry.location)}${field("People", "characters", entry.characters, 180)}<div class="row"><button class="primary" data-mutate>Save note</button><button type="button" data-refresh="${escapeHTML(entry.messageId)}" data-mutate>Resummarize</button><button type="button" data-jump="${escapeHTML(entry.messageId)}">Find source</button><button type="button" data-delete="${escapeHTML(entry.id)}" data-mutate>Delete note</button></div></form></details></article>`).join("") || '<div class="empty">No fragments yet. Pick a native message to start, or fill the first ten gaps.</div>'}</div><section class="future-section"><div class="eyebrow">NOT CANON. NOT YET.</div><h3>Spoilers ahead</h3><label class="check"><input class="spoilers-enabled" type="checkbox" data-mutate ${settings.spoilersEnabled ? "checked" : ""}>Let Kazz assess and inject planned events</label><p class="muted">“After N messages” is the earliest opportunity. Kazz can defer a beat to protect the current scene. Mark an event fulfilled once it happens.</p><form class="new-spoiler"><label class="field">Something you want to happen or be mentioned<textarea name="text" maxlength="2000" placeholder="The letter finally reaches her. Let it land after the argument."></textarea></label><div class="story-fields"><label>Timing<select name="timing"><option value="auto">Let Kazz decide</option value="after">After N new messages</option></select></label><label>Messages<input name="delay" type="number" min="0" max="1000" value="10"></label></div><button class="primary" data-mutate>Add future beat</button></form><button class="assess-future" data-mutate ${settings.spoilersEnabled ? "" : "disabled"}>Assess the scene now</button><div class="future-beats">${story.spoilers.map((event) => `<details class="future-beat ${event.status}"><summary><span class="badge">${event.status.toUpperCase()}</span> ${escapeHTML(event.text.slice(0, 100))}</summary><p>${escapeHTML(event.reason || "Waiting for a scene assessment.")}</p><form data-spoiler="${escapeHTML(event.id)}"><label class="field">Future event<textarea name="text" maxlength="2000">${escapeHTML(event.text)}</textarea></label><div class="story-fields"><label>Timing<select name="timing"><option value="auto" ${event.afterMessages === null ? "selected" : ""}>Let Kazz decide</option><option value="after" ${event.afterMessages !== null ? "selected" : ""}>After N new messages</option></select></label><label>Messages<input name="delay" type="number" min="0" max="1000" value="${event.afterMessages ?? 10}"></label></div><label>Status<select name="status">${["planned", "paused", "fulfilled"].map((status) => `<option ${status === (event.status === "ready" ? "planned" : event.status) ? "selected" : ""}>${status}</option>`).join("")}</select></label><div class="row field"><button class="primary" data-mutate>Save event</button><button type="button" data-remove-spoiler="${escapeHTML(event.id)}" data-mutate>Delete event</button></div></form></details>`).join("")}</div></section>`;
+  const toggle = (selector, key) => body.querySelector(selector).addEventListener("change", (event) => {
+    ui.run("settings", { settings: { ...ui.view().state.settings, [key]: event.target.checked } }, "Timeline preferences saved for this chat.");
+  });
+  toggle(".timeline-auto", "timelineAuto");
+  toggle(".timeline-inject", "timelineInject");
+  toggle(".spoilers-enabled", "spoilersEnabled");
+  body.querySelector(".summarize-one").addEventListener("click", () => {
+    const messageId = ui.target()?.id;
+    if (!messageId) {
+      ui.notify("Pick or follow a native message first.", true);
+      return;
+    }
+    ui.run("timelineMessage", { messageId }, "Message added to Summary+.");
+  });
+  body.querySelector(".fill-timeline").addEventListener("click", () => {
+    ui.run("timelineBatch", {}, "Next timeline gaps filled.");
+  });
+  body.querySelector(".older-notes")?.addEventListener("click", more);
+  body.querySelectorAll("[data-entry]").forEach((form) => form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (ui.busy())
+      return;
+    ui.run("timelineSave", { id: form.dataset.entry, ...Object.fromEntries(["summary", "storyDate", "storyTime", "location", "characters"].map((key) => [key, value(form, `[name=${key}]`)])) }, "Timeline note saved.");
+  }));
+  body.querySelectorAll("[data-refresh]").forEach((b) => b.addEventListener("click", () => {
+    ui.run("timelineMessage", { messageId: b.dataset.refresh }, "Timeline note refreshed from the current swipe.");
+  }));
+  body.querySelectorAll("[data-jump]").forEach((b) => b.addEventListener("click", () => ui.jump(b.dataset.jump)));
+  body.querySelectorAll("[data-delete]").forEach((b) => b.addEventListener("click", () => {
+    ui.run("timelineDelete", { id: b.dataset.delete }, "Timeline note removed.");
+  }));
+  const saveEvent = (form, id) => {
+    if (ui.busy())
+      return;
+    ui.run("spoilerSave", { id, text: value(form, "[name=text]"), afterMessages: value(form, "[name=timing]") === "auto" ? null : Number(value(form, "[name=delay]")), status: id ? value(form, "[name=status]") : "planned" }, "Future beat saved. Assess now or wait for the next reply.");
+  };
+  const form = body.querySelector(".new-spoiler");
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    saveEvent(form);
+  });
+  body.querySelectorAll("[data-spoiler]").forEach((form) => form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    saveEvent(form, form.dataset.spoiler);
+  }));
+  body.querySelectorAll("[data-remove-spoiler]").forEach((b) => b.addEventListener("click", () => {
+    ui.run("spoilerDelete", { id: b.dataset.removeSpoiler }, "Future beat removed.");
+  }));
+  body.querySelector(".assess-future").addEventListener("click", () => {
+    ui.run("planSpoilers", {}, "Scene assessed. Ready beats are eligible for prompt injection.");
+  });
+}
+var STORY_CSS = `
+.merge-drawer{margin:22px 0;border:2px solid var(--ice);padding:12px;background:#11191f}.merge-drawer>summary{font:900 21px var(--display);cursor:pointer}.merge-drawer small{display:block;font:9px var(--mono);color:var(--red)}.swipe-choices{display:grid;gap:14px;max-height:420px;overflow:auto;margin:14px 0;scrollbar-width:thin}.swipe-choice{display:block;border:1px solid #63828d;background:#19232b;padding:12px}.swipe-choice:has(input:checked){border-color:var(--red);box-shadow:3px 3px 0 var(--red)}.swipe-choice>span{font:700 12px var(--mono);color:var(--ice)}.swipe-choice pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.65 system-ui;margin-bottom:0}.merge-history{display:grid;gap:9px;margin:20px 0}.story-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}.story-fields>*{min-width:0}.story-fields input,.story-fields select{width:100%}.timeline-switches{border-left:3px solid var(--ice);padding-left:12px}.memory-timeline{position:relative;margin:25px 0 28px;padding-left:22px}.memory-timeline:before{content:'';position:absolute;left:5px;top:0;bottom:0;width:2px;background:linear-gradient(var(--ice),#466779 80%,transparent)}.memory-node{position:relative;margin:0 0 24px;animation:memory-in .25s ease-out}.memory-node:before{content:'';position:absolute;left:-21px;top:14px;width:10px;height:10px;transform:rotate(45deg);background:var(--ice);box-shadow:0 0 12px #bce9f360}.memory-date{display:flex;gap:8px;flex-wrap:wrap;font:700 10px var(--mono);letter-spacing:.04em;color:var(--ice);margin-bottom:7px}.memory-date time{color:#9ab0bb}.memory-node>details{padding:12px;background:#172129;border:1px solid #49626e;box-shadow:3px 4px 0 #080d12}.memory-node>details>summary{cursor:pointer;list-style:none}.memory-summary{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-line;font:14px/1.55 system-ui}.memory-meta{display:block;margin-top:7px;font:9px/1.5 var(--mono);color:#a6c0cc}.memory-node.stale:before{background:var(--red)}.memory-node.stale .memory-meta{color:#ff98a1}.memory-node .row{gap:8px}.memory-node button{font-size:12px}.future-section{border-top:2px dashed var(--red);padding-top:20px}.future-section h3{font:900 32px var(--display);margin:6px 0 15px}.new-spoiler{background:#211b23;border:1px solid #995465;padding:13px;margin:18px 0}.future-beat{border-left:3px solid #a480b3;padding:12px;background:#1c1822;margin:16px 0}.future-beat.ready{border-color:var(--red)}.future-beat.fulfilled{opacity:.65}.future-beat>summary{cursor:pointer;font-size:13px}.future-beat .badge{font-size:9px}.future-beat p{font-size:12px;color:#cdb9d6}.name-history{margin-top:16px;display:grid;gap:8px}@keyframes memory-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}@media(prefers-reduced-motion:reduce){.memory-node{animation:none}}`;
+
 // src/native-selection.ts
 function readNativeSelection(dom) {
   const selection = window.getSelection();
@@ -762,7 +874,7 @@ function inlineGallery(dom, load, react) {
 }
 
 // src/frontend.ts
-var TABS = [["home", "Kazz"], ["edit", "Editor"], ["slop", "De-slop"], ["chat", "Chat"], ["gallery", "Gallery"], ["notebook", "Notebook"], ["settings", "Settings"]];
+var TABS = [["home", "Kazz"], ["edit", "Editor"], ["slop", "De-slop"], ["chat", "Chat"], ["gallery", "Gallery"], ["notebook", "Notebook"], ["timeline", "Summary+"], ["settings", "Settings"]];
 function randomId() {
   return Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
@@ -804,6 +916,7 @@ function setup(ctx) {
   let askDraft = "";
   let slopDraft;
   let settingsDraft;
+  let timelineShown = 30;
   let pageId = "";
   let frame;
   let status = "Open a chat to wake Kazz.";
@@ -826,7 +939,7 @@ function setup(ctx) {
   const petButton = petRoot.querySelector("button");
   const petImage = petRoot.querySelector("img");
   const root = panel.root.attachShadow({ mode: "open" });
-  root.innerHTML = `<style>${CSS}</style><section class="shell" data-screen="home" aria-label="KazzWare"><header class="top"><div class="title" role="button" tabindex="0" aria-label="Move KazzWare menu; drag or use arrow keys" title="Drag to move · arrow keys also work"><div class="brand-line"><span class="brand">KAZZWARE<em>.exe</em></span><span class="badge">FRIENDLY MALWARE</span></div><div class="chat-name"></div></div><button class="quick-settings" aria-label="Connection settings">⚙</button><button class="icon close" aria-label="Close KazzWare">×</button></header><nav aria-label="KazzWare sections"></nav><main class="body"></main><footer class="status" role="status" aria-live="polite"><span></span><button class="cancel-pick" hidden>Cancel pick</button><button class="cancel" hidden>Stop</button></footer></section>`;
+  root.innerHTML = `<style>${CSS}${STORY_CSS}</style><section class="shell" data-screen="home" aria-label="KazzWare"><header class="top"><div class="title" role="button" tabindex="0" aria-label="Move KazzWare menu; drag or use arrow keys" title="Drag to move · arrow keys also work"><div class="brand-line"><span class="brand">KAZZWARE<em>.exe</em></span><span class="badge">FRIENDLY MALWARE</span></div><div class="chat-name"></div></div><button class="quick-settings" aria-label="Connection settings">⚙</button><button class="icon close" aria-label="Close KazzWare">×</button></header><nav aria-label="KazzWare sections"></nav><main class="body"></main><footer class="status" role="status" aria-live="polite"><span></span><button class="cancel-pick" hidden>Cancel pick</button><button class="cancel" hidden>Stop</button></footer></section>`;
   const body = root.querySelector(".body");
   const nav = root.querySelector("nav");
   const statusBox = root.querySelector(".status");
@@ -854,7 +967,7 @@ function setup(ctx) {
     statusBox.querySelector(".cancel-pick").hidden = !picking;
     statusBox.querySelector(".cancel").hidden = busy === 0;
     body.querySelectorAll("[data-mutate],.pick-message,.follow-target,.messages").forEach((control) => {
-      control.disabled = busy > 0;
+      control.disabled = busy > 0 || control.matches(".merge-now") && body.querySelectorAll(".merge-form input:checked").length < 2 || control.matches(".assess-future") && !view?.state.settings.spoilersEnabled;
     });
   }
   function rpc(action, data = {}) {
@@ -1298,6 +1411,7 @@ function setup(ctx) {
     slopDraft = undefined;
     settingsDraft = undefined;
     pageId = "";
+    timelineShown = 30;
     busy = 0;
     frame?.destroy();
     frame = undefined;
@@ -1318,6 +1432,43 @@ function setup(ctx) {
     if (event.chatId === chatId && view?.state.settings.galleryEnabled && event.messageId && event.generationType === "normal" && !event.error)
       run("tick", { messageId: event.messageId, generationType: event.generationType }, "Peanut Gallery is up to date.");
   }));
+  const storyUI = {
+    view: () => view,
+    target: () => target,
+    busy: () => busy > 0,
+    pin: pinTarget,
+    run,
+    rpc,
+    notify,
+    jump(id) {
+      const element = ctx.dom.findMessageElement?.(id);
+      if (element)
+        element.scrollIntoView({ behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
+      else
+        notify("That source is not mounted. Scroll back in the native chat to find it.", true);
+    }
+  };
+  const autoStory = (id, countNew) => {
+    if (!chatId || !view || ![view.state.settings.autoName, view.state.settings.timelineAuto, view.state.settings.spoilersEnabled].some(Boolean))
+      return;
+    run("storyTick", { messageId: id, countNew }, "Kazz’s story notes are up to date.");
+  };
+  disposers.push(ctx.events.on("MESSAGE_SENT", (payload) => {
+    const event = payload;
+    if (event.chatId === chatId && event.message?.content.trim())
+      autoStory(event.message.id, true);
+  }));
+  disposers.push(ctx.events.on("GENERATION_ENDED", (payload) => {
+    const event = payload;
+    if (event.chatId === chatId && event.messageId && !event.error && ["normal", "continue", "regenerate", "swipe", "impersonate"].includes(event.generationType || "normal"))
+      autoStory(event.messageId, event.generationType === "normal" || event.generationType === "impersonate");
+  }));
+  for (const eventName of ["MESSAGE_SWIPED", "SWIPE_EDITED", "MESSAGE_EDITED"])
+    disposers.push(ctx.events.on(eventName, (payload) => {
+      const event = payload;
+      if (event.chatId === chatId && event.message?.content.trim())
+        autoStory(event.message.id, false);
+    }));
   function button(selector, handler) {
     body.querySelector(selector)?.addEventListener("click", handler);
   }
@@ -1359,6 +1510,14 @@ function setup(ctx) {
       renderNotebook();
     if (tab === "settings")
       renderSettings();
+    if (tab === "timeline") {
+      renderTimeline(body, storyUI, timelineShown, () => {
+        timelineShown += 30;
+        render();
+      });
+      body.insertAdjacentHTML("afterbegin", targetControls());
+      wireTargetControls();
+    }
     if (!["home", "chat"].includes(tab)) {
       const sheet = document.createElement("div");
       sheet.className = "workbench";
@@ -1412,6 +1571,7 @@ function setup(ctx) {
       button(".apply", () => edit("reform"));
       button(".deslop", () => edit("deslop"));
     }
+    mountMerger(body, storyUI);
     body.querySelectorAll("[data-undo]").forEach((b) => b.addEventListener("click", () => {
       run("undo", { undoId: b.dataset.undo }, "Undone. Previous wording restored.");
     }));
@@ -1517,8 +1677,8 @@ function setup(ctx) {
   }
   function renderSettings() {
     const s = settingsDraft || view.state.settings;
-    body.innerHTML = `${heading("06 / SETTINGS", "Under the hood", "HANDLE WITH CARE")}<p class="muted">Saved separately for each chat.</p><label class="field">Kazz’s connection<select class="connection"><option value="">Choose a connection…</option>${view.connections.map((c) => `<option value="${escapeHTML(c.id)}" ${c.id === s.connectionId ? "selected" : ""}>${escapeHTML(c.name)} · ${escapeHTML(c.model)}</option>`).join("")}</select></label><small>Uses this saved connection for every Kazz request. Your roleplay connection stays as it is.</small><label class="check"><input class="commentary-enabled" type="checkbox" ${s.commentaryEnabled ? "checked" : ""}>Let Kazz comment from his widget</label><small>One short aside per new message or unseen swipe, using this connection. Off by default; never adds to the chat. Bubbles fade after 14 seconds or can be dismissed.</small><label class="field">Recent messages in working context (5–100)<input class="context" type="number" min="5" max="100" value="${s.contextMessages}"></label><label class="field">Gallery interval (normal replies)<input class="interval" type="number" min="1" max="100" value="${s.interval}"></label><label class="field">Gallery format<select class="format">${[["random", "Surprise me"], ["forum", "AITA / discussion forum"], ["thread", "Fandom social thread"], ["wiki", "Unofficial wiki"]].map(([key, label]) => `<option value="${key}" ${key === s.format ? "selected" : ""}>${label}</option>`).join("")}</select></label><label class="field">Mascot size<input class="size" type="range" min="70" max="180" value="${s.mascotSize}"></label><div class="row"><button class="primary save-settings" data-mutate>Save settings</button><button class="reload-state">Reload</button></div><div class="note">Context goes to the connection you select. Search can inspect older messages; summaries read the whole chat. Kazz never receives connection API keys.</div>`;
-    const read = () => ({ ...view.state.settings, commentaryEnabled: body.querySelector(".commentary-enabled").checked, connectionId: body.querySelector(".connection").value, contextMessages: Number(body.querySelector(".context").value), interval: Number(body.querySelector(".interval").value), format: body.querySelector(".format").value, mascotSize: Number(body.querySelector(".size").value) });
+    body.innerHTML = `${heading("06 / SETTINGS", "Under the hood", "HANDLE WITH CARE")}<p class="muted">Saved separately for each chat.</p><label class="field">Kazz’s connection<select class="connection"><option value="">Choose a connection…</option>${view.connections.map((c) => `<option value="${escapeHTML(c.id)}" ${c.id === s.connectionId ? "selected" : ""}>${escapeHTML(c.name)} · ${escapeHTML(c.model)}</option>`).join("")}</select></label><small>Uses this saved connection for every Kazz request. Your roleplay connection stays as it is.</small><label class="check"><input class="commentary-enabled" type="checkbox" ${s.commentaryEnabled ? "checked" : ""}>Let Kazz comment from his widget</label><small>One short aside per new message or unseen swipe, using this connection. Off by default; never adds to the chat. Bubbles fade after 14 seconds or can be dismissed.</small><label class="check"><input class="auto-name" type="checkbox" ${s.autoName ? "checked" : ""}>Automatically name this chat</label><label class="field">Rename every 10–50 new messages<input class="name-interval" type="number" min="10" max="50" value="${s.nameInterval}"></label><small>First title on the next new message; then at this interval. Swipes do not advance the count. Existing titles may be replaced while enabled.</small><button class="name-now" data-mutate>Name chat now</button><label class="field">Recent messages in working context (5–100)<input class="context" type="number" min="5" max="100" value="${s.contextMessages}"></label><label class="field">Gallery interval (normal replies)<input class="interval" type="number" min="1" max="100" value="${s.interval}"></label><label class="field">Gallery format<select class="format">${[["random", "Surprise me"], ["forum", "AITA / discussion forum"], ["thread", "Fandom social thread"], ["wiki", "Unofficial wiki"]].map(([key, label]) => `<option value="${key}" ${key === s.format ? "selected" : ""}>${label}</option>`).join("")}</select></label><label class="field">Mascot size<input class="size" type="range" min="70" max="180" value="${s.mascotSize}"></label><div class="row"><button class="primary save-settings" data-mutate>Save settings</button><button class="reload-state">Reload</button></div><div class="note">Context goes to the connection you select. Search can inspect older messages; summaries read the whole chat. Kazz never receives connection API keys.</div>`;
+    const read = () => ({ ...view.state.settings, autoName: body.querySelector(".auto-name").checked, nameInterval: Number(body.querySelector(".name-interval").value), commentaryEnabled: body.querySelector(".commentary-enabled").checked, connectionId: body.querySelector(".connection").value, contextMessages: Number(body.querySelector(".context").value), interval: Number(body.querySelector(".interval").value), format: body.querySelector(".format").value, mascotSize: Number(body.querySelector(".size").value) });
     body.querySelectorAll("input,select").forEach((input) => input.addEventListener("input", () => {
       settingsDraft = read();
     }));
@@ -1527,6 +1687,16 @@ function setup(ctx) {
       settingsDraft = undefined;
       run("settings", { settings: next }, "Settings saved for this chat.");
     });
+    button(".name-now", () => {
+      run("nameChat", {}, "Chat renamed. Title Undo is below.");
+    });
+    const nameHistory = document.createElement("div");
+    nameHistory.className = "name-history";
+    nameHistory.innerHTML = [...view.state.story.names].reverse().filter((n) => n.status !== "undone").map((n) => `<button data-name-undo="${escapeHTML(n.id)}" data-mutate>Undo title: ${escapeHTML(n.after)}</button>`).join("");
+    nameHistory.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+      run("undoName", { id: b.dataset.nameUndo }, "Previous chat title restored.");
+    }));
+    body.append(nameHistory);
     button(".reload-state", () => {
       settingsDraft = undefined;
       run("load", {}, "Reloaded.");

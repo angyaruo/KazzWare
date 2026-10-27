@@ -1,3 +1,4 @@
+import { migrate, storyView, StoryFeatures, type StoryJob } from './story';
 import type { SpindleAPI, LlmMessageDTO } from 'lumiverse-spindle-types';
 import { CHANNEL, emptyState, integer, messageView, object, parseJSON, replaceRange, sameMessage, settings, slopHits, string, type GalleryPage, type Message, type Range, type Reply, type Request, type State, type View } from './shared';
 
@@ -10,7 +11,8 @@ export class KazzService {
   private bindings = new Map<string, Binding>();
   private queues = new Map<string, Promise<unknown>>();
   private requests = new Map<string, Promise<Reply>>();
-  constructor(private api: SpindleAPI) {}
+  private story: StoryFeatures;
+  constructor(private api: SpindleAPI) { this.story = new StoryFeatures(api); }
   private key(user: string, client: string) { return `${user}\0${client}`; }
   private path(chatId: string) { return `chats/${encodeURIComponent(chatId)}.json`; }
   private send(request: Request, user: string, session: string | undefined, reply: Partial<Reply>) {
@@ -56,7 +58,7 @@ export class KazzService {
         const timer = setTimeout(() => controller.abort(), 600_000);
         try {
           const state = await this.api.userStorage.getJson<State>(this.path(req.chatId!), { fallback: emptyState(), userId: user });
-          state.settings.commentaryEnabled ??= false; state.commented ??= [];
+          migrate(state);
           if (state.version !== 1) throw new Error('KazzWare storage needs a newer extension version.');
           const job: Job = { request: req, user, binding: captured, signal: controller.signal, state };
           this.live(job);
@@ -86,7 +88,7 @@ export class KazzService {
     const [chat, messages, connections] = await Promise.all([this.api.chats.get(job.request.chatId!, job.user), this.messages(job), this.api.connections.list(job.user)]);
     // Keep routine UI replies below the host's 4 MB WebSocket ceiling. Full
     // sources, summaries and gallery pages are fetched individually on demand.
-    const state = { ...job.state,
+    const state = { ...job.state, story: await storyView(job.state, messages),
       undo: job.state.undo.map(({ before, after, ...metadata }) => metadata),
       pages: job.state.pages.map(({ posts, votes, comments, ...metadata }) => metadata),
       turns: job.state.turns.slice(-50).map(t => ({ ...t, content: excerpt(t.content, 4000) })),
@@ -127,6 +129,9 @@ export class KazzService {
     const summary = [...job.state.summaries].reverse().find(s => messages.some(m => m.id === s.throughMessage));
     return { chat: { id: chat?.id, name: chat?.name }, card: clip(card, 16_000), persona: clip(persona, 6000), activatedLore: clip(lore, 12_000), messages: messages.slice(-job.state.settings.contextMessages).map(m => ({ id: m.id, name: m.name, content: m.content.slice(0, 5000) })), totalMessages: messages.length, summary: summary?.text || '' };
   }
+  private storyJob(job: Job): StoryJob {
+    return { chatId: job.request.chatId!, user: job.user, state: job.state, live: () => this.live(job), save: () => { this.live(job); return this.save(job); }, messages: () => this.messages(job), context: through => this.context(job, through), model: (instruction, data, tokens) => this.model(job, instruction, data, tokens) };
+  }
   private async dispatch(job: Job): Promise<unknown> {
     const data = job.request.data!;
     switch (job.request.action) {
@@ -137,6 +142,29 @@ export class KazzService {
         if (!message) throw new Error('Message no longer exists.');
         return message;
       }
+      case 'swipes': return this.story.swipes(this.storyJob(job), data.messageId);
+      case 'mergeSwipes': await this.story.merge(this.storyJob(job), data); return this.view(job);
+      case 'undoMerge': await this.story.undoMerge(this.storyJob(job), data.id); return this.view(job);
+      case 'nameChat': await this.story.name(this.storyJob(job)); return this.view(job);
+      case 'undoName': await this.story.undoName(this.storyJob(job), data.id); return this.view(job);
+      case 'timelineMessage': await this.story.summarizeMessage(this.storyJob(job), data.messageId); return this.view(job);
+      case 'timelineBatch': {
+        const entries = (await storyView(job.state, await this.messages(job))).timeline;
+        const missing = (await this.messages(job)).filter(m => m.content.trim() && !entries.some(e => e.messageId === m.id && !e.stale)).slice(0, 10);
+        for (let i = 0; i < missing.length; i++) { this.progress(job, `Summary+ · ${i + 1} / ${missing.length}`); await this.story.summarizeMessage(this.storyJob(job), missing[i].id); }
+        return this.view(job);
+      }
+      case 'timelineSave': await this.story.saveEntry(this.storyJob(job), data); return this.view(job);
+      case 'timelineDelete': {
+        const entry = job.state.story.timeline.find(e => e.id === data.id);
+        job.state.story.timeline = job.state.story.timeline.filter(e => e.id !== data.id);
+        if (entry) job.state.story.timelineVersions = job.state.story.timelineVersions.filter(e => e.messageId !== entry.messageId);
+        await this.save(job); return this.view(job);
+      }
+      case 'spoilerSave': await this.story.saveSpoiler(this.storyJob(job), data); return this.view(job);
+      case 'spoilerDelete': job.state.story.spoilers = job.state.story.spoilers.filter(e => e.id !== data.id); job.state.story.planKey = ''; await this.save(job); return this.view(job);
+      case 'planSpoilers': await this.story.plan(this.storyJob(job), true); return this.view(job);
+      case 'storyTick': await this.story.tick(this.storyJob(job), data); return this.view(job);
       case 'commentary': return this.commentary(job, data);
       case 'page': return job.state.pages.find(p => p.id === data.pageId) || null;
       case 'summaryContent': return job.state.summaries.find(s => s.id === data.summaryId)?.text || '';

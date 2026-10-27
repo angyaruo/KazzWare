@@ -1,4 +1,4 @@
-# KazzWare 0.4.0 architecture
+# KazzWare 0.6.0 architecture
 
 ## Runtime and dependencies
 
@@ -52,7 +52,7 @@ Routine UI replies carry message previews, Undo metadata and gallery page metada
 
 ## Permissions
 
-`generation` selects and calls saved connections; `chats` reads chat identity and attaches new lorebooks; `chat_mutation` reads/edits messages; `ui_panels` provides widgets/actions. `characters`, `personas`, `presets`, `world_books`, `databanks`, and `memories` support reference tools, with `world_books` also creating lorebooks. Spindle user storage is a free capability. The extension does not request interception, external network, native filesystem/process, secret storage, unrestricted regex, app manipulation or arbitrary code-execution capabilities.
+`generation` selects and calls saved connections; `chats` reads chat identity, updates its title and attaches new lorebooks; `chat_mutation` reads/edits messages and swipes; `ui_panels` provides widgets/actions. `interceptor` adds optional Summary+/future-beat prompt context. `characters`, `personas`, `presets`, `world_books`, `databanks`, and `memories` support reference tools, with `world_books` also creating lorebooks. Spindle user storage is a free capability. The extension does not request external network, native filesystem/process, secret storage, unrestricted regex, app manipulation or arbitrary code-execution capabilities.
 
 ## Sources
 
@@ -71,3 +71,19 @@ Routine UI replies carry message previews, Undo metadata and gallery page metada
 The backend `commentary` action uses the selected connection, bounded context through the latest message and a 256-token budget. It checks source/swipe equality before and after the model call. SHA-256 keys of message ID, swipe ID and content are persisted before generation (latest 1000 per chat), so repeated delivery and other tabs cannot charge again, including failures. Existing storage gains `settings.commentaryEnabled = false` and an empty `commented` list. This operation does not write roleplay, assistant turns, Undo or Gallery counters. `cancelCommentary` aborts only commentary controllers; disabling and chat switches invalidate frontend results. A failed event is consumed; a genuinely new message/swipe can trigger again.
 
 `float-position.ts` retains requested drag coordinates independently of legacy host placement reads, preserves them through size/show calls and skips unchanged sizes. Menu opening uses the visible mascot bounds (host UI scale included), then clamps beside it. Native highlight controls now debounce the surface itself and suppress it while a selection pointer is held.
+
+## Story features (0.6.0)
+
+`story-types.ts`, `story.ts` and `story-ui.ts` separate story persistence, backend operations and frontend controls. The existing per-user/chat queue, authenticated binding, cancellation and selected-connection path apply to every new action. Older storage receives default-off settings and an empty story state within schema version 1.
+
+Swipe reads use `chat.getMessages`. A hash covers all swipe text, dates and the active index. Merge validates at least two distinct indices, generates once, rereads the hash, persists a prepared journal and rereads again before `chat.updateMessage` appends a new swipe. The host derives active content from the supplied array/index. Undo restores the complete prior array only when the current hash matches; prepared records recover failed final saves. Opening swipes pins the native target. Read payloads cap at 500,000 characters, selected generation input at 100,000, and journals at ten.
+
+Naming uses `chats.update(chatId, { name }, userId)`, checking the current title before writing and storing a prepared journal. Titles are bounded to 80 characters; the model is asked for 3–8 searchable words without spoilers. Undo will not replace a subsequent manual title. Automatic counting consumes distinct new message IDs before generation. The first new message triggers naming, then the saved 10–50-message interval; failed intervals are consumed. Swipes, continuations, regenerations and edits do not advance the count. Ten title journals and 2,000 seen IDs are retained.
+
+Summary+ hashes the active swipe index and full content before and after generation. Notes contain a short summary and explicit in-story date/time, location and people, with unknown values blank. Editing an annotation retains its source hash and cannot certify a changed source. Automatic capture preserves manual notes for unchanged sources. Replaced notes are cached by source hash, allowing restoration when revisiting a swipe, including manual annotations. Current notes and alternate cache each retain 500 entries. Deleting a note clears its alternate cache. Consumed generation keys retain 2,000 entries; failed or evicted versions can be explicitly resummarized. The alternate cache and full merge snapshots are omitted from frontend replies. Backfill processes up to ten missing/stale messages and saves each independently.
+
+Spoilers retain at most 50 events, with optional 0–1,000-message eligibility thresholds anchored to the last message when saved. Changing a delay reanchors it; editing a ready event returns it to planned. Assessment is an explicit generation outside the interceptor, triggered after assistant replies or relevant swipe/edit events, or manually. A hash of the full history and eligible candidates deduplicates assessment. Old readiness is cleared before generation; the model chooses zero or one event. History is checked again before readiness is saved. Paused/fulfilled events are never candidates. Fulfillment is marked by the user.
+
+The optional public interceptor runs at priority 50. It checks authenticated ownership and reads stored state; it never generates, mutates storage, changes the saved preset or writes chat messages. Quiet and impersonate generations are excluded. When `excludeMessageId` is provided for regeneration/swiping, history stops before that message, excluding the rejected reply and later notes. Only source-hash-matching notes are eligible: at most the latest 80, trimmed from the oldest until serialized JSON is at most 18,000 characters.
+
+Future readiness requires unchanged history through the assessed anchor and only user messages after it. A newer assistant reply or earlier edit requires reassessment. One ready event is included in a separately labeled, optional future-intent block. Notes and future intent share a named system message before conversational history, preserving final user/prefill order. Injection goes to the roleplay connection as part of its request; generation and assessment use Kazz's connection. Model timing, extraction and writing quality remain semantic judgments, not deterministic guarantees. Denied Interceptor permission leaves other tools working; granting it requires restarting the extension to register the hook.

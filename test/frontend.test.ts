@@ -333,3 +333,63 @@ test('switching commentary off cancels its pending response and prevents a late 
   await settleView(); expect(document.querySelector<HTMLElement>('[data-kazzware-owned=commentary]')!.hidden).toBe(true);
   h.event({ chatId: 'chat-a', messageId: 'm1', generationType: 'normal' }); await settleView(); expect(h.f.modelInputs).toHaveLength(1);
 });
+
+
+test('swipe merger UI requires two selections and creates a new swipe with accessible Undo', async () => {
+  const h = await harness(); const m = h.f.messages.get('chat-a')![0]; m.swipes = [m.content, 'He returns the key.']; m.swipe_dates = [100, 200];
+  h.select('m1'); await until(() => !!h.root.querySelector('.direction'));
+  h.click('.load-swipes'); await until(() => !!h.root.querySelector('.merge-form'));
+  const form = h.root.querySelector<HTMLFormElement>('.merge-form')!, submit = h.root.querySelector<HTMLButtonElement>('.merge-now')!;
+  expect(submit.disabled).toBe(true);
+  const choices = form.querySelectorAll<HTMLInputElement>('input[type=checkbox]'); choices[0].checked = true; choices[0].dispatchEvent(new h.dom.window.Event('change', { bubbles: true })); expect(submit.disabled).toBe(true);
+  choices[1].checked = true; choices[1].dispatchEvent(new h.dom.window.Event('change', { bubbles: true })); expect(submit.disabled).toBe(false);
+  h.f.outputs.push('{"replacement":"He waits, then returns the key."}'); form.dispatchEvent(new h.dom.window.Event('submit', { bubbles: true, cancelable: true }));
+  await until(() => m.swipes!.length === 3); await until(() => !!h.root.querySelector('[data-merge-undo]'));
+  expect(m.swipes!.slice(0, 2)).toEqual(['He watched the pale orbs. Then he waited.', 'He returns the key.']);
+  await until(() => !h.root.querySelector<HTMLButtonElement>('[data-merge-undo]')!.disabled); h.click('[data-merge-undo]'); await until(() => m.swipes!.length === 2);
+});
+
+test('Summary+ edits timeline notes, saves planned beats, and keeps injection opt-in', async () => {
+  const h = await harness(); h.native('m1', '', 250); h.select('m1'); await until(() => !!h.root.querySelector('.direction')); h.click('[data-tab=timeline]');
+  expect(h.root.querySelector<HTMLInputElement>('.timeline-inject')!.checked).toBe(false);
+  h.f.outputs.push('{"summary":"Elias watches and waits.","storyDate":"","storyTime":"","location":"","characters":"Elias"}'); h.click('.summarize-one');
+  await until(() => !!h.root.querySelector('[data-entry]')); await until(() => !h.root.querySelector<HTMLButtonElement>('.summarize-one')!.disabled);
+  expect(h.root.querySelector('.memory-date')!.textContent).toContain('DATE UNKNOWN');
+  const form = h.root.querySelector<HTMLFormElement>('[data-entry]')!; form.querySelector<HTMLTextAreaElement>('[name=summary]')!.value = 'The user corrected this note.';
+  form.dispatchEvent(new h.dom.window.Event('submit', { bubbles: true, cancelable: true })); await until(() => h.f.state().story.timeline[0].manual);
+  await until(() => !h.root.querySelector<HTMLButtonElement>('.summarize-one')!.disabled);
+  const future = h.root.querySelector<HTMLFormElement>('.new-spoiler')!; future.querySelector<HTMLTextAreaElement>('[name=text]')!.value = '<img src=x onerror=alert(1)> A letter arrives.';
+  future.dispatchEvent(new h.dom.window.Event('submit', { bubbles: true, cancelable: true })); await until(() => !!h.root.querySelector('.future-beat'));
+  expect(h.root.querySelector('.future-beat img')).toBeNull(); expect(h.f.state().story.spoilers[0].afterMessages).toBeNull(); expect(h.f.state().settings.spoilersEnabled).toBe(false);
+  await until(() => !h.root.querySelector<HTMLButtonElement>('.summarize-one')!.disabled);
+  const inject = h.root.querySelector<HTMLInputElement>('.timeline-inject')!; inject.checked = true; inject.dispatchEvent(new h.dom.window.Event('change'));
+  await until(() => h.f.state().settings.timelineInject); expect(h.f.updates).toHaveLength(0);
+});
+
+test('namer settings save the interval and manual naming exposes title Undo', async () => {
+  const h = await harness(); h.open(); h.click('[data-tab=settings]');
+  h.root.querySelector<HTMLInputElement>('.auto-name')!.checked = true; h.root.querySelector<HTMLInputElement>('.name-interval')!.value = '30'; h.click('.save-settings');
+  await until(() => h.f.state().settings.nameInterval === 30); expect(h.f.state().settings.autoName).toBe(true);
+  await until(() => !h.root.querySelector<HTMLButtonElement>('.name-now')!.disabled); h.f.outputs.push('{"name":"The Lighthouse Keeps Its Secrets"}'); h.click('.name-now');
+  await until(() => !!h.root.querySelector('[data-name-undo]')); expect(h.root.querySelector('.chat-name')!.textContent).toBe('The Lighthouse Keeps Its Secrets');
+  await until(() => !h.root.querySelector<HTMLButtonElement>('[data-name-undo]')!.disabled); h.click('[data-name-undo]'); await until(() => h.f.chats.get('chat-a')!.name === 'The Lighthouse');
+});
+
+test('Summary+ automation follows completed replies, swipe navigation and native edits without counting them as new titles', async () => {
+  const h = await harness(); h.f.state().settings.timelineAuto = true; h.f.state().settings.autoName = true;
+  h.open(); h.click('[data-tab=settings]'); h.click('.reload-state');
+  await until(() => h.root.querySelector<HTMLInputElement>('.auto-name')!.checked);
+  const m = h.f.messages.get('chat-a')![0];
+  h.f.outputs.push('{"name":"The Lighthouse Watches"}', '{"summary":"He waits.","storyDate":"","storyTime":"","location":"","characters":""}');
+  h.event({ chatId: 'chat-a', messageId: m.id, generationType: 'normal' });
+  await until(() => h.f.state().story.timeline.length === 1);
+  m.swipe_id = 1; m.content = 'He leaves.'; h.f.outputs.push('{"summary":"He leaves.","storyDate":"","storyTime":"","location":"","characters":""}');
+  h.event({ chatId: 'chat-a', message: m }, 'MESSAGE_SWIPED');
+  await until(() => h.f.state().story.timeline[0].summary === 'He leaves.');
+  m.content = 'He returns.'; h.f.outputs.push('{"summary":"He returns.","storyDate":"","storyTime":"","location":"","characters":""}');
+  h.event({ chatId: 'chat-a', message: m }, 'MESSAGE_EDITED');
+  await until(() => h.f.state().story.timeline[0].summary === 'He returns.');
+  expect(h.f.state().story.nameCount).toBe(0); expect(h.f.state().story.names).toHaveLength(1);
+  h.event({ chatId: 'chat-a', messageId: m.id, generationType: 'quiet' });
+  await settleView(); expect(h.f.modelInputs).toHaveLength(4);
+});

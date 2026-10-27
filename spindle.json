@@ -1,7 +1,7 @@
 {
   "identifier": "kazzware",
   "name": "KazzWare",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "author": "angyaruo",
   "description": "Your chat's foul-mouthed little accomplice. Precise edits, Undo, de-slop, lore, and a fictional fandom in your pocket.",
   "github": "https://github.com/angyaruo/KazzWare",
@@ -9,5 +9,5 @@
   "minimum_lumiverse_version": "1.2.5",
   "entry_backend": "dist/backend.js",
   "entry_frontend": "dist/frontend.js",
-  "permissions": ["generation", "chats", "chat_mutation", "ui_panels", "characters", "personas", "presets", "world_books", "databanks", "memories"]
+  "permissions": ["generation", "interceptor", "chats", "chat_mutation", "ui_panels", "characters", "personas", "presets", "world_books", "databanks", "memories"]
 }

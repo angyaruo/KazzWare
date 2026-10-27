@@ -1,17 +1,18 @@
 import type { SpindleAPI } from 'lumiverse-spindle-types';
 import { KazzService } from '../src/service';
 import { CHANNEL, emptyState, type Message, type Reply, type Request, type State } from '../src/shared';
+type FakeMessage = Message & { swipes?: string[]; swipe_dates?: number[]; send_date?: number };
 export function fake() {
   const store = new Map<string, State>(); const replies: Reply[] = []; const updates: { chat: string; id: string; content: string }[] = [];
   const modelInputs: unknown[] = []; const outputs: string[] = []; const books: unknown[] = [];
   const chats = new Map([['chat-a', { id: 'chat-a', character_id: 'character', name: 'The Lighthouse', metadata: { custom: true, chat_world_book_ids: ['existing'] } }], ['chat-b', { id: 'chat-b', character_id: 'character', name: 'Other chat', metadata: {} }]]);
-  const messages = new Map<string, Message[]>([['chat-a', [{ id: 'm1', content: 'He watched the pale orbs. Then he waited.', name: 'Elias', is_user: false, swipe_id: 0, index_in_chat: 0 }]], ['chat-b', [{ id: 'm2', content: 'Different story.', name: 'Ari', is_user: false, swipe_id: 0, index_in_chat: 0 }]]]);
+  const messages = new Map<string, FakeMessage[]>([['chat-a', [{ id: 'm1', content: 'He watched the pale orbs. Then he waited.', name: 'Elias', is_user: false, swipe_id: 0, index_in_chat: 0 }]], ['chat-b', [{ id: 'm2', content: 'Different story.', name: 'Ari', is_user: false, swipe_id: 0, index_in_chat: 0 }]]]);
   let failSave = 0, saves = 0, finish = 'stop';
   let gate: (() => Promise<void>) | undefined;
   const api = {
     sendToFrontend: (reply: Reply) => { replies.push(structuredClone(reply)); },
     chats: { get: async (id: string, user: string) => user === 'alice' ? structuredClone(chats.get(id)) : null, update: async (id: string, input: Record<string, unknown>) => { const c = { ...chats.get(id)!, ...input }; chats.set(id, c); return c; }, getMemories: async () => [] },
-    chat: { getMessages: async (id: string) => structuredClone(messages.get(id) || []), updateMessage: async (chat: string, id: string, patch: { content: string }) => { updates.push({ chat, id, content: patch.content }); messages.get(chat)!.find(m => m.id === id)!.content = patch.content; } },
+    chat: { getMessages: async (id: string) => structuredClone(messages.get(id) || []), updateMessage: async (chat: string, id: string, patch: { content?: string; swipes?: string[]; swipe_id?: number; swipe_dates?: number[] }) => { const m = messages.get(chat)!.find(m => m.id === id)!; if (patch.swipes) m.swipes = [...patch.swipes]; if (patch.swipe_dates) m.swipe_dates = [...patch.swipe_dates]; if (patch.swipe_id !== undefined) m.swipe_id = patch.swipe_id; if (patch.content !== undefined) { m.content = patch.content; if (m.swipes?.length) m.swipes[m.swipe_id] = patch.content; } else if (m.swipes?.length) m.content = m.swipes[m.swipe_id]; updates.push({ chat, id, content: m.content }); } },
     connections: { list: async () => [{ id: 'connection', name: 'My connection', model: 'test', provider: 'test', api_key: 'NEVER-EXPOSE' }], get: async (id: string) => id === 'connection' ? { id } : null },
     characters: { get: async () => ({ name: 'Elias' }), list: async () => ({ data: [], total: 0 }) },
     personas: { getActive: async () => ({ name: 'Traveler' }) },

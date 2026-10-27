@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.0 — Swipes, titles, Summary+ and future beats
+
+- Add the Editor swipe merger: inspect alternate replies, choose two or more, and provide optional direction. Append a new active swipe without removing originals. Keep ten durable, conflict-aware merge Undo records.
+- Add per-chat automatic naming, off by default, with a 10–50 new-message interval, manual naming and ten title Undo records. Duplicate events, swipes and edits do not advance the title counter.
+- Add Summary+: editable message-level summaries with in-story dates, times, locations and people; a scrollable timeline; native-source navigation; manual ten-message backfill; separate default-off automatic capture and prompt-injection controls. Preserve manual notes for unchanged sources and cache alternate notes for revisited swipes.
+- Add Spoilers ahead to the future end of the timeline. Store optional message thresholds, assess whether one beat fits the scene, and inject ready intentions separately from established facts. Events can be paused, edited, deleted or marked fulfilled. Earlier history edits and newer assistant replies invalidate old readiness.
+- Add the public `interceptor` permission for optional prompt context. The read-only hook scopes access to the authenticated chat/user, excludes stale notes and rejected/future history during regeneration, skips quiet calls, and makes no provider calls. No new runtime dependencies.
+- Extend deterministic backend/frontend regression coverage and the interactive preview. Preserve existing immediate editing/Undo, selection timing, floating placement and commentary.
+
 ## 0.5.0 — Selection timing, widget placement and commentary
 
 - Native highlight controls now wait until pointer release and 160 ms of selection stability. Keyboard/mobile handle changes restart the delay; cancelled gestures and chat changes retire pending prompts.

@@ -1,19 +1,20 @@
+import { emptyStory, type StoryState, type StoryView } from './story-types';
 export const CHANNEL = 'kazzware.v1';
 export type Range = { start: number; end: number };
 export type Message = { id: string; content: string; name: string; is_user: boolean; swipe_id: number; index_in_chat: number };
-export type Settings = { connectionId: string; slop: string[]; wholeWords: boolean; galleryEnabled: boolean; commentaryEnabled: boolean; interval: number; format: 'random' | 'forum' | 'thread' | 'wiki'; contextMessages: number; mascotSize: number };
+export type Settings = { connectionId: string; slop: string[]; wholeWords: boolean; galleryEnabled: boolean; commentaryEnabled: boolean; interval: number; format: 'random' | 'forum' | 'thread' | 'wiki'; contextMessages: number; mascotSize: number; autoName: boolean; nameInterval: number; timelineAuto: boolean; timelineInject: boolean; spoilersEnabled: boolean };
 export type Post = { id: string; author: string; title: string; body: string };
 export type GalleryPage = { id: string; title: string; format: 'forum' | 'thread' | 'wiki'; posts: Post[]; createdAt: number; throughMessage: string; votes: string[]; comments: { id: string; postId: string; body: string; author: string }[] };
 export type Undo = { id: string; label: string; messageId: string; before: string; after: string; swipe: number; createdAt: number; status: 'prepared' | 'applied' | 'undone' };
 export type Turn = { role: 'user' | 'assistant'; content: string; at: number };
 export type Summary = { id: string; text: string; throughMessage: string; messages: number; createdAt: number };
-export type State = { version: 1; settings: Settings; undo: Undo[]; turns: Turn[]; summaries: Summary[]; pages: GalleryPage[]; counted: string[]; commented: string[]; count: number; lorebooks: { id: string; name: string; createdAt: number }[] };
-export type ViewState = Omit<State, 'undo' | 'pages'> & { undo: Omit<Undo, 'before' | 'after'>[]; pages: Omit<GalleryPage, 'posts' | 'votes' | 'comments'>[] };
+export type State = { version: 1; story: StoryState; settings: Settings; undo: Undo[]; turns: Turn[]; summaries: Summary[]; pages: GalleryPage[]; counted: string[]; commented: string[]; count: number; lorebooks: { id: string; name: string; createdAt: number }[] };
+export type ViewState = Omit<State, 'undo' | 'pages' | 'story'> & { story: StoryView; undo: Omit<Undo, 'before' | 'after'>[]; pages: Omit<GalleryPage, 'posts' | 'votes' | 'comments'>[] };
 export type View = { state: ViewState; chatName: string; messages: Message[]; totalMessages: number; connections: { id: string; name: string; model: string; provider: string }[] };
 export type Request = { channel: typeof CHANNEL; client: string; binding: string; id: string; chatId: string | null; action: string; data?: Record<string, unknown> };
 export type Reply = { channel: typeof CHANNEL; client: string; binding: string; id: string; ok?: boolean; result?: unknown; error?: string; progress?: string };
-export const DEFAULTS: Settings = { connectionId: '', slop: ['a shiver ran down', 'a testament to', 'couldn’t help but', 'could not help but', 'orbs'], wholeWords: true, galleryEnabled: false, commentaryEnabled: false, interval: 5, format: 'random', contextMessages: 30, mascotSize: 110 };
-export function emptyState(): State { return { version: 1, settings: { ...DEFAULTS, slop: [...DEFAULTS.slop] }, undo: [], turns: [], summaries: [], pages: [], counted: [], commented: [], count: 0, lorebooks: [] }; }
+export const DEFAULTS: Settings = { connectionId: '', slop: ['a shiver ran down', 'a testament to', 'couldn’t help but', 'could not help but', 'orbs'], wholeWords: true, galleryEnabled: false, commentaryEnabled: false, interval: 5, format: 'random', contextMessages: 30, mascotSize: 110, autoName: false, nameInterval: 20, timelineAuto: false, timelineInject: false, spoilersEnabled: false };
+export function emptyState(): State { return { version: 1, story: emptyStory(), settings: { ...DEFAULTS, slop: [...DEFAULTS.slop] }, undo: [], turns: [], summaries: [], pages: [], counted: [], commented: [], count: 0, lorebooks: [] }; }
 export function string(value: unknown, name: string, max = 8000): string {
   if (typeof value !== 'string' || !value.trim() || value.length > max) throw new Error(`${name} must contain 1–${max} characters.`);
   return value;
@@ -30,8 +31,9 @@ export function settings(value: unknown): Settings {
   const v = object(value);
   if (typeof v.connectionId !== 'string' || v.connectionId.length > 200 || !Array.isArray(v.slop) || v.slop.length > 300) throw new Error('Invalid connection or phrase list (maximum 300 phrases).');
   if (typeof v.wholeWords !== 'boolean' || typeof v.galleryEnabled !== 'boolean' || (v.commentaryEnabled !== undefined && typeof v.commentaryEnabled !== 'boolean')) throw new Error('Invalid toggle.');
+  for (const key of ['autoName', 'timelineAuto', 'timelineInject', 'spoilersEnabled']) if (v[key] !== undefined && typeof v[key] !== 'boolean') throw new Error('Invalid story toggle.');
   if (!['random', 'forum', 'thread', 'wiki'].includes(String(v.format))) throw new Error('Unknown gallery format.');
-  return { connectionId: v.connectionId, slop: [...new Set(v.slop.map(x => string(x, 'Phrase', 200).trim()))], wholeWords: v.wholeWords, galleryEnabled: v.galleryEnabled, commentaryEnabled: v.commentaryEnabled === true, interval: integer(v.interval, 1, 100), format: v.format as Settings['format'], contextMessages: integer(v.contextMessages, 5, 100), mascotSize: integer(v.mascotSize, 70, 180) };
+  return { connectionId: v.connectionId, slop: [...new Set(v.slop.map(x => string(x, 'Phrase', 200).trim()))], wholeWords: v.wholeWords, galleryEnabled: v.galleryEnabled, commentaryEnabled: v.commentaryEnabled === true, interval: integer(v.interval, 1, 100), format: v.format as Settings['format'], contextMessages: integer(v.contextMessages, 5, 100), mascotSize: integer(v.mascotSize, 70, 180), autoName: v.autoName === true, nameInterval: integer(v.nameInterval ?? 20, 10, 50), timelineAuto: v.timelineAuto === true, timelineInject: v.timelineInject === true, spoilersEnabled: v.spoilersEnabled === true };
 }
 export function parseJSON(text: string): Record<string, unknown> {
   const cleaned = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
