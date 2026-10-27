@@ -9,7 +9,7 @@ export type StoryJob = {
 };
 export function migrate(state: State) {
   state.settings = { ...DEFAULTS, ...state.settings };
-  state.commented ??= []; state.story = { ...emptyStory(), ...state.story };
+  state.commented ??= []; state.commentaryCount ??= 0; state.story = { ...emptyStory(), ...state.story };
   return state;
 }
 const sourceHash = (message: Message) => fingerprint([message.swipe_id, message.content]);

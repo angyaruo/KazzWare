@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.0 — Compact glass UI and mobile peeker
+
+- Replace the large, text-heavy home tiles with nine compact icon-and-label buttons around Kazz. Use charcoal/silver smoked glass, red hover/focus/press glow and readable work surfaces. Keep transparent gaps and a scroll-free home at checked portrait phone sizes.
+- Put Commentary, Chat names and Swipes directly on Home. Give automation controls styled switches, sliders and segmented choices; keep connection/setup preferences in Settings.
+- Add commentary frequency (every 1–50 unique new messages/swipes), bubble sizes and duration (3–120 seconds or Until closed). Defaults preserve existing behavior. Skipped events retain the current bubble; duplicate events never advance the counter or trigger another provider call.
+- Use the supplied peeking pose as a smaller mobile launcher that docks to either edge when released. Preserve desktop placement separately, keep menu anchoring, and offer the round phone launcher in Settings. Add the supplied cover art as the input-bar icon.
+- Migrate existing settings within storage version 1; add no permissions or dependencies. Extend deterministic coverage, rebuild tracked bundles and update the interactive preview.
+
 ## 0.6.0 — Swipes, titles, Summary+ and future beats
 
 - Add the Editor swipe merger: inspect alternate replies, choose two or more, and provide optional direction. Append a new active swipe without removing originals. Keep ten durable, conflict-aware merge Undo records.

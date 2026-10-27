@@ -1,31 +1,32 @@
-# Alpha 0.6.0 verification · 2026-10-27
+# Alpha 0.7.0 verification · 2026-10-27
 
 ## Confirmed locally
 
-- Windows x64; Bun 1.4.4, Node 22.15.1, TypeScript 5.9.3, Spindle SDK 0.6.49. No new runtime dependencies; new `interceptor` permission for optional roleplay prompt context.
-- `npm run check`: type checking, **69 tests / 347 assertions across eight files**, and both tracked ESM bundles passed. Backend: 56,559 bytes; frontend: 10,627,082 bytes, including original owner artwork and local font.
+- Windows x64; Bun 1.4.4, Node 22.15.1, TypeScript 5.9.3, Spindle SDK 0.6.49. No new dependencies or permissions in this release.
+- `npm run check`: type checking, **73 tests / 389 assertions across eight files**, and both tracked ESM bundles passed. Backend: 57,399 bytes; frontend: 15,358,548 bytes, including original owner artwork and local font.
 - The exact backend scanner from Lumiverse main `3d74148383dded2b379f204532cf375b52bcd201` accepts the bundle without capability exemptions; its prohibited-call negative control passed.
 - `git diff --check` passed. Preview rebuilt from the shipped frontend. Runtime/source ZIPs are packaged from tracked release files after commit.
 
-New regressions cover distinct swipe selection, preserved originals/dates, stale-source rejection, full-swipe Undo conflicts and prepared-journal recovery; title counters, interval bounds, duplicate events, concurrent manual names and Undo; short editable notes, unknown dates, source invalidation, alternate-note restoration, manual annotations and cache deletion; spoiler eligibility, deferral, fulfillment, scene freshness and earlier edits; and prompt ownership, quiet calls, aborts, insertion order and regeneration cutoff.
+New regressions cover all nine Home destinations, dedicated Commentary/Chat names/Swipes controls, staying in Swipes after a native pick, mobile edge docking and restoration of desktop placement. Commentary tests cover preference bounds and persistence, unique-event counting, skipped events without provider calls, duplicate delivery, counter resets, until-closed bubbles and expiry after changing duration.
 
-Frontend tests exercise the real frontend/service with deterministic host/model fakes. They cover selection gating and merge Undo, timeline forms and injection opt-in, escaped future-event text, naming controls and Undo, and automatic summaries for completed replies, swipes and native edits. All earlier highlight, exact-range Undo, drag/position, chat switching, commentary, Gallery, assistant, notebook and isolation tests still pass.
+Frontend tests exercise the real frontend/service with deterministic host/model fakes. All earlier swipe merge/Undo, title conflict protection, Summary+/future-beat injection, highlight timing, exact-range Undo, drag/position, chat switching, Gallery, assistant, notebook and isolation tests still pass.
 
 ## Rendered preview checks
 
-Browser access worked for this release. The shipped frontend was exercised in the in-app browser at the default 1280×720 desktop viewport and responsive 390×844 and 320×700 viewports. Checked timeline navigation, expanded note fields, edited summary/time persistence, default-off injection, future-event assessment/status, two-swipe gating, merge/Undo changing and restoring native sample prose, and manual naming. Timeline/future-event containers showed no horizontal content overflow at narrow widths. The existing floating layout stays scrollable and keeps native chat visible around it.
+The shipped frontend was exercised in the in-app browser at 1280×720 desktop and responsive 390×844 and 320×700 viewports. Home showed all nine destinations without internal overflow at both phone widths. Checked glass edges/red interaction glow, direct feature navigation, commentary switches/size/duration controls and sample bubbles, naming interval/save/manual naming/Undo, swipe loading, chat and timeline readability. The peeker measured 64×84, docked to both edges after dragging and retained its position when the menu opened. Tool content remains scrollable; gaps around the home buttons keep the native chat visible.
 
 The preview is sample-only and deterministic: no AI requests, Lumiverse API calls or production chat writes. Its manual handlers demonstrate layout and interaction; backend tests validate real automation counters and interception. This is not physical-touch-device or end-to-end live-provider evidence. Native integration, provider quality/latency and prompt effects still need a live smoke pass after installation.
 
 ## Live smoke test after update
 
-1. Merge/update to 0.6.0, grant **Interceptor** for prompt injection, restart KazzWare and refresh Lumiverse. Existing work should remain. Select Kazz's connection.
-2. Pick a message with multiple swipes, load the Editor merger and choose two or more. Try blank and explicit directions. Verify a new active swipe, preserved originals and Undo; confirm a newer manual edit blocks an old merge Undo.
-3. Enable naming at 10 messages. Verify the first new message names the chat and the next ten distinct user/assistant messages trigger another title. Swipes/edits must not count. Try manual naming and Undo, including after a manual title change.
-4. In Summary+, summarize a native message and fill ten gaps. Edit summary/date/time/place/people. Enable automatic capture, generate/navigate swipes and edit native text. Verify source changes, alternate-note restoration and manual annotations. Unknown dates stay unknown.
-5. Enable timeline injection and inspect the prompt breakdown for **KazzWare · Summary+ / future beats**. Current notes should appear; stale/deleted sources should not. Regenerate an older message: its rejected summary and later facts must be absent. Disable injection and verify the block disappears when no future beat is eligible.
-6. Add a future beat after two new messages. Enable assessment/injection. It must remain ineligible before the threshold, may be deferred afterward, and appears only as optional future intent when ready. Edit earlier history, pause or mark fulfilled: old readiness must not be injected. Changing the delay restarts counting.
-7. Recheck native highlight release timing, selection editing/Undo, mascot/menu movement and anchoring, commentary and inline Gallery. Exercise physical phone touch/selection handles, keyboard viewport, virtualization, chat switching, reload and extension disable/re-enable.
+1. Merge/update to 0.7.0, restart KazzWare and refresh Lumiverse. Confirm the version and existing saved data. No additional permissions should appear when upgrading from 0.6.0. Select Kazz's connection if needed.
+2. Check all nine Home buttons, red hover/press feedback, keyboard focus, text contrast over different chat backgrounds and reduced-motion settings. On a physical phone, drag the peeker to either edge, open/close tools, rotate the screen and open the keyboard. Toggle back to the round launcher in Settings and verify menu anchoring.
+3. Open Commentary from Home. Try interval 2, each bubble size, a short timed bubble and Until closed. Verify skipped/duplicate events do not replace the current bubble, unseen swipes advance the interval once, and disabling/chat switching clears the bubble. Try Chat names from Home: first-message naming, 10-message updates, manual naming and Undo; swipes/edits must not advance its count.
+4. Open Swipes from Home, pick a native message and choose two or more replies. Try blank and explicit directions. Verify a new active swipe, preserved originals and Undo; confirm a newer manual edit blocks an old merge Undo.
+5. In Summary+, summarize a native message and fill ten gaps. Edit summary/date/time/place/people. Enable automatic capture, generate/navigate swipes and edit native text. Verify source changes, alternate-note restoration and manual annotations. Unknown dates stay unknown.
+6. Enable timeline injection and inspect the prompt breakdown for **KazzWare · Summary+ / future beats** (requires Interceptor permission). Current notes should appear; stale/deleted sources should not. Regenerate an older message: its rejected summary and later facts must be absent. Disable injection and verify the block disappears when no future beat is eligible.
+7. Add a future beat after two new messages. Enable assessment/injection. It must remain ineligible before the threshold, may be deferred afterward, and appears only as optional future intent when ready. Edit earlier history, pause or mark fulfilled: old readiness must not be injected. Changing the delay restarts counting.
+8. Recheck native highlight release timing, selection editing/Undo, inline Gallery, touch selection handles, virtualization, reload and extension disable/re-enable.
 
 ## Constraints
 

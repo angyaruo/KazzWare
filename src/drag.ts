@@ -1,7 +1,7 @@
 import type { SpindleFloatWidgetHandle } from 'lumiverse-spindle-types';
 
 /** Own the gesture instead of relying on a host drag listener across Shadow DOM. */
-export function draggable(handle: HTMLElement, widget: Pick<SpindleFloatWidgetHandle, 'root' | 'getPosition' | 'moveTo'>) {
+export function draggable(handle: HTMLElement, widget: Pick<SpindleFloatWidgetHandle, 'root' | 'getPosition' | 'moveTo'>, onSettled?: () => void) {
   let gesture: { id: number; x: number; y: number; start: { x: number; y: number }; scale: number; moved: boolean } | undefined;
   let suppressUntil = 0;
   const scale = () => {
@@ -33,7 +33,7 @@ export function draggable(handle: HTMLElement, widget: Pick<SpindleFloatWidgetHa
   const finish = (event: PointerEvent) => {
     if (!gesture || event.pointerId !== gesture.id) return;
     if (event.type === 'pointerup') drag(event);
-    cancel();
+    const moved = gesture.moved; cancel(); if (moved) onSettled?.();
   };
   const click = (event: MouseEvent) => {
     if (event.detail !== 0 && Date.now() < suppressUntil) { event.preventDefault(); event.stopImmediatePropagation(); }
@@ -45,6 +45,7 @@ export function draggable(handle: HTMLElement, widget: Pick<SpindleFloatWidgetHa
     event.preventDefault(); event.stopPropagation();
     const p = widget.getPosition(), step = event.shiftKey ? 40 : 10;
     move(p.x + delta[0] * step, p.y + delta[1] * step);
+    onSettled?.();
   };
   handle.style.touchAction = 'none'; handle.style.userSelect = 'none';
   handle.addEventListener('pointerdown', down); handle.addEventListener('click', click, true);
