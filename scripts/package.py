@@ -13,7 +13,7 @@ manifest = json.loads((root / "spindle.json").read_text(encoding="utf-8"))
 version = manifest["version"]
 tracked = subprocess.check_output(["git", "ls-files", "-z"], cwd=root).decode("utf-8").split("\0")
 tracked = [name for name in tracked if name]
-release_files = [name for name in tracked if name in {"spindle.json", "README.md", "CHANGELOG.md", "assets/README.md", "assets/fonts/OFL.txt"} or name.startswith(("dist/", "docs/"))]
+release_files = [name for name in tracked if name in {"spindle.json", "README.md", "CHANGELOG.md", "assets/README.md", "assets/kazz-cover.png", "assets/fonts/OFL.txt"} or name.startswith(("dist/", "docs/", "assets/readme/"))]
 results = []
 for suffix, names, prefix in [("runtime", release_files, "kazzware"), ("source", tracked, "KazzWare")]:
     path = destination / f"KazzWare-{version}-{suffix}.zip"
