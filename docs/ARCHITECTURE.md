@@ -1,4 +1,6 @@
-# KazzWare 0.7.1 architecture
+# KazzWare 0.7.2 architecture
+
+Kazz's shared personality is the `PERSONA` constant in `src/service.ts`. Every model request receives it before the task instruction. The owner's voice paragraph applies to Kazz's own dialogue and reader-facing reactions; shipping and speculation are noncanonical opinions. Task instructions preserve source voice for edits/merges and factual output for continuity records. The paragraph is shipped in the backend rather than stored in per-chat settings.
 
 ## Runtime and dependencies
 

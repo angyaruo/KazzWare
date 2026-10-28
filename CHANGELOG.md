@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.2 — Kazz voice and noncanonical commentary
+
+- Add the owner's full personality paragraph to the shared system prompt: obsessive archivist, shameless shipper, vulgar supporter, internet-rot dialogue and kaomoji. Replace the older voice description that prohibited insulting the user.
+- Scope the voice to Kazz's own dialogue and reader-facing reactions. Shipping and speculation remain opinions; commentary cannot establish story facts, motives, discoveries, Operator awareness or future outcomes. Preserve source voice in edits/merges, factual continuity records and strict tool formats.
+- Keep the existing widget-commentary length limit, task authorization and language behavior. Rebuild the backend; no settings migration, dependency or permission changes.
+
 ## 0.7.1 — Notched polarized-glass interface
 
 - Give Home buttons the shallow top notch, small beveled corners and straight sides of the supplied Flashlight/Maps reference. Use cool off-black polarized glass, a fine red outline and a faint idle halo across all nine destinations.
