@@ -1,11 +1,11 @@
 # Changelog
 
-## 0.7.1 — Damaged terminal interface
+## 0.7.1 — Notched polarized-glass interface
 
-- Recreate the supplied interface reference with scalable screen housings: chipped red edges, cable loops, scanlines, surface grain, barcodes, warning symbols and small hardware LEDs. Keep Editor, Chat and Commentary on distressed off-white panels, with the other tools on dark screens.
-- Preserve the nine working Home destinations around the original Kazz artwork. Increase label/icon size, add a local live date/time on Home, and keep the active chat name in tool headers. Keep the connection shortcut visible after setup.
-- Carry red accents into readable tool surfaces without placing grunge over form text. Keep keyboard focus, drag handles, mobile peeking, transparent gaps, short-viewport scrolling and reduced-motion support.
-- Use local SVG/CSS only, with no added image downloads, dependencies, permissions or storage changes. Rebuild the tracked frontend and sample preview; retain all existing behavior tests.
+- Give Home buttons the shallow top notch, small beveled corners and straight sides of the supplied Flashlight/Maps reference. Use cool off-black polarized glass, a fine red outline and a faint idle halo across all nine destinations.
+- Sweep a glass reflection across hovered, focused or pressed controls. Brighten the edge on interaction; retain a separate keyboard focus ring and disable motion when reduced motion is requested. Keep navigation immediate.
+- Preserve the compact layout around the original Kazz artwork. Add local live date/time on Home, keep the active chat name in tool headers and keep the connection shortcut visible after setup. Carry the same glass treatment onto the header, shortcut and status strip.
+- Keep readable tool surfaces, drag handles, mobile peeking, transparent gaps and short-viewport scrolling. Use local SVG/CSS only, with no new image downloads, dependencies, permissions or storage changes. Rebuild the tracked frontend and sample preview; retain all existing behavior tests.
 
 ## 0.7.0 — Compact glass UI and mobile peeker
 

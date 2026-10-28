@@ -12,7 +12,7 @@ The nine PNGs were supplied by the project owner as KazzWare's mascot references
 
 The owner’s two hand-drawn layouts inform the floating composition. Those reference drawings are not shipped.
 
-The later “Interfaz cyberpunk glitch con personaje central.png” supplied by the owner informs the damaged terminal housings in 0.7.1. Its layout and surface details are recreated with original local SVG/CSS in `src/chrome.ts`; the reference image is not shipped as a flattened interface. Labels and controls remain native HTML elements.
+The owner's later Flashlight/Maps screenshot informs the notched panel silhouette in 0.7.1. Cool polarized glass, red edges and animated reflections are drawn with original local SVG/CSS in `src/chrome.ts`; reference screenshots are not shipped as flattened interfaces. Labels and controls remain native HTML elements.
 
 The project owner has not granted a public redistribution license for this artwork. Do not treat dependency licenses as a license to the mascot images.
 
