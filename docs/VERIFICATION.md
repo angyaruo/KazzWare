@@ -1,17 +1,17 @@
-# Alpha 0.7.1 verification · 2026-10-27
+# Alpha 0.7.2 verification · 2026-10-28
 
 ## Confirmed locally
 
 - Windows x64; Bun 1.4.4, Node 22.15.1, TypeScript 5.9.3, Spindle SDK 0.6.49. No new dependencies or permissions in this release.
-- `npm run check`: type checking, **73 tests / 389 assertions across eight files**, and both tracked ESM bundles passed. Backend: 57,399 bytes; frontend: 15,367,896 bytes, including original owner artwork and local font.
-- The backend is unchanged from 0.7.0. The exact backend scanner from Lumiverse main `3d74148383dded2b379f204532cf375b52bcd201` accepts the bundle without capability exemptions; its prohibited-call negative control passed.
+- `npm run check`: type checking, **73 tests / 389 assertions across eight files**, and both tracked ESM bundles passed. Backend: 58,473 bytes; frontend: 15,367,896 bytes, including original owner artwork and local font.
+- The backend's shared personality and widget-reaction instructions changed. The exact backend scanner from Lumiverse main `3d74148383dded2b379f204532cf375b52bcd201` accepts the rebuilt bundle without capability exemptions; its prohibited-call negative control passed.
 - `git diff --check` passed. Preview rebuilt from the shipped frontend. Runtime/source ZIPs are packaged from tracked release files after commit.
 
-This is a presentation update; no new tests mirror the decorative CSS. The existing suite covers all nine Home destinations, Commentary/Chat names/Swipes controls, native picking, mobile docking/desktop restoration, commentary settings/counters and expiry.
+This is a prompt update. An additional local smoke check captured real assistant and edit request envelopes using the deterministic host fake: both contained the owner's personality paragraph verbatim, the source-voice boundary, and no obsolete prohibition on insulting the user. No provider calls were made. Automated checks cannot establish whether a particular provider consistently performs the intended voice or respects the noncanonical boundary.
 
 Frontend tests exercise the real frontend/service with deterministic host/model fakes. All earlier swipe merge/Undo, title conflict protection, Summary+/future-beat injection, highlight timing, exact-range Undo, drag/position, chat switching, Gallery, assistant, notebook and isolation tests still pass.
 
-## Rendered preview checks
+## Retained 0.7.1 rendered preview evidence
 
 The shipped frontend was exercised in the in-app browser at 1280×720 desktop and responsive 390×844 and 320×700 viewports. Home showed all nine destinations, the header, connection shortcut and footer without internal scrolling at both portrait phone widths; button text widths did not overflow at 320 pixels. All nine destinations opened at 320 pixels without horizontal overflow. Checked the notched silhouette, off-black glass fill and red idle edge. A hovered settings control showed its visible reflection, the 0.68-second sweep animation and full edge opacity (0.5 at rest); keyboard focus also triggered the sweep and retained a separate 2-pixel ring. At 700×390, Home used its scrolling fallback and the connection shortcut remained reachable. Tools retain scrolling. Original transparent Kazz art and the existing mobile peeker remain unchanged. Reduced-motion rules were inspected in source; physical touch remains a live smoke check.
 
@@ -21,7 +21,7 @@ The preview is sample-only and deterministic: no AI requests, Lumiverse API call
 
 ## Live smoke test after update
 
-1. Merge/update to 0.7.1, restart KazzWare and refresh Lumiverse. Confirm the version and existing saved data. No additional permissions should appear when upgrading from 0.7.0. Select Kazz's connection if needed.
+1. Merge/update to 0.7.2, restart KazzWare and refresh Lumiverse. Confirm the version and existing saved data. No additional permissions should appear when upgrading from 0.7.1. Select Kazz's connection if needed. Ask Kazz to react and enable widget commentary: inspect the new voice and confirm shipping/speculation stays opinion. Edit a message and create a factual summary: Kazz's own slang and reactions must not leak into either output.
 2. Check all nine Home buttons, red hover/press feedback, keyboard focus, text contrast over different chat backgrounds and reduced-motion settings. On a physical phone, drag the peeker to either edge, open/close tools, rotate the screen and open the keyboard. Toggle back to the round launcher in Settings and verify menu anchoring.
 3. Open Commentary from Home. Try interval 2, each bubble size, a short timed bubble and Until closed. Verify skipped/duplicate events do not replace the current bubble, unseen swipes advance the interval once, and disabling/chat switching clears the bubble. Try Chat names from Home: first-message naming, 10-message updates, manual naming and Undo; swipes/edits must not advance its count.
 4. Open Swipes from Home, pick a native message and choose two or more replies. Try blank and explicit directions. Verify a new active swipe, preserved originals and Undo; confirm a newer manual edit blocks an old merge Undo.
