@@ -1,0 +1,66 @@
+{
+  "tool": "Built-in image_gen",
+  "transparent_background": true,
+  "assets": [
+    {
+      "slug": "message-editor",
+      "text": "MESSAGE EDITOR",
+      "prompt": "Use case: logo-brand. Asset type: transparent PNG section-title banner for the KazzWare GitHub README. Create ONE original wide horizontal title graphic with the EXACT text \"MESSAGE EDITOR\". Typography: huge readable condensed angular silver-white capitals, subtle black extrusion and thin blood-red keyline so it works on both light and dark GitHub themes. Malware cybercore aesthetic matching KazzWare's gothic silver-haired cyber-scorpion cover art: glossy off-black polarized glass shards, red pixel-corruption fringe, a small pencil/cursor emblem, red terminal corner brackets, tiny cable-like hooks. Palette strictly off-black, metallic silver/white, and electric crimson red. Restrained detailed corruption around the edge, clean lettering. Compact 5:1 horizontal silhouette centered with modest transparent margins, no character, no scene, no extra words, no tiny illegible subtitle, no watermark. True transparent alpha everywhere outside the isolated title/emblem assembly, no solid rectangle background, no checkerboard painted into the image. Keep the title dominant and legible when displayed 480 pixels wide.",
+      "file": "message-editor.png"
+    },
+    {
+      "slug": "de-slop",
+      "text": "DE-SLOP",
+      "prompt": "Use case: logo-brand. Asset type: transparent PNG section-title banner for KazzWare GitHub README. One original wide horizontal title graphic. EXACT text \"DE-SLOP\". Huge readable angular condensed metallic silver-white capital letters, black extrusion and thin electric-crimson keyline. Match a gothic malware cybercore visual family: glossy off-black polarized-glass shards around the letters, red pixel corruption fringe, terminal corner brackets and cable-like hooks. Feature emblem: an eraser deleting red corrupted pixels, small and subordinate to lettering. Palette ONLY silver-white, off-black and electric crimson red. Clean readable text with richly detailed but restrained edges. Compact approximately 5:1 horizontal silhouette with modest transparent margins. No character, scene, additional words, subtitle or watermark. True alpha transparency outside title/emblem assembly, NO solid background or painted checkerboard. Legible displayed at 480 pixels wide.",
+      "file": "de-slop.png"
+    },
+    {
+      "slug": "swipe-merger",
+      "text": "SWIPE MERGER",
+      "prompt": "Use case: logo-brand. Asset type: transparent PNG section-title banner for KazzWare GitHub README. One original wide horizontal title graphic. EXACT text \"SWIPE MERGER\". Huge readable angular condensed metallic silver-white capital letters, black extrusion and thin electric-crimson keyline. Match a gothic malware cybercore visual family: glossy off-black polarized-glass shards around the letters, red pixel corruption fringe, terminal corner brackets and cable-like hooks. Feature emblem: two branching response arrows merging into a single cursor, small and subordinate to lettering. Palette ONLY silver-white, off-black and electric crimson red. Clean readable text with richly detailed but restrained edges. Compact approximately 5:1 horizontal silhouette with modest transparent margins. No character, scene, additional words, subtitle or watermark. True alpha transparency outside title/emblem assembly, NO solid background or painted checkerboard. Legible displayed at 480 pixels wide.",
+      "file": "swipe-merger.png"
+    },
+    {
+      "slug": "chat-with-kazz",
+      "text": "CHAT WITH KAZZ",
+      "prompt": "Use case: logo-brand. Asset type: transparent PNG section-title banner for KazzWare GitHub README. One original wide horizontal title graphic. EXACT text \"CHAT WITH KAZZ\". Huge readable angular condensed metallic silver-white capital letters, black extrusion and thin electric-crimson keyline. Match a gothic malware cybercore visual family: glossy off-black polarized-glass shards around the letters, red pixel corruption fringe, terminal corner brackets and cable-like hooks. Feature emblem: a speech bubble with a tiny mischievous terminal face, small and subordinate to lettering. Palette ONLY silver-white, off-black and electric crimson red. Clean readable text with richly detailed but restrained edges. Compact approximately 5:1 horizontal silhouette with modest transparent margins. No character, scene, additional words, subtitle or watermark. True alpha transparency outside title/emblem assembly, NO solid background or painted checkerboard. Legible displayed at 480 pixels wide.",
+      "file": "chat-with-kazz.png"
+    },
+    {
+      "slug": "peanut-gallery",
+      "text": "PEANUT GALLERY",
+      "prompt": "Use case: logo-brand. Create one transparent PNG horizontal feature-title banner for KazzWare README, exact text \"PEANUT GALLERY\". Huge clean readable condensed angular metallic silver-white capitals with black extrusion and thin electric crimson red keyline. Gothic malware cybercore visual family: glossy off-black polarized glass shards, red pixel-corruption fringe, terminal corner brackets, cable hooks; small subordinate emblem of a smartphone showing three tiny gossip bubbles. Palette only silver-white, off-black, crimson. Compact 5:1 horizontal silhouette, modest transparent margins, legible at 480px wide. No character, scene, subtitles, extra words or watermark. Truly transparent alpha outside the isolated title assembly, no solid backdrop, no fake checkerboard.",
+      "file": "peanut-gallery.png"
+    },
+    {
+      "slug": "summary-plus",
+      "text": "SUMMARY+",
+      "prompt": "Use case: logo-brand. Create one transparent PNG horizontal feature-title banner for KazzWare README, exact text \"SUMMARY+\" including the PLUS SIGN. Huge clean readable condensed angular metallic silver-white capitals with black extrusion and thin electric crimson red keyline. Gothic malware cybercore visual family: glossy off-black polarized glass shards, red pixel-corruption fringe, terminal corner brackets, cable hooks; small subordinate emblem of a chronological timeline with three connected nodes and a document. Palette only silver-white, off-black, crimson. Compact 5:1 horizontal silhouette, modest transparent margins, legible at 480px wide. No character, scene, subtitles, extra words or watermark. Truly transparent alpha outside the isolated title assembly, no solid backdrop, no fake checkerboard.",
+      "file": "summary-plus.png"
+    },
+    {
+      "slug": "spoilers-ahead",
+      "text": "SPOILERS AHEAD",
+      "prompt": "Use case: logo-brand. Create one transparent PNG horizontal feature-title banner for KazzWare README, exact text \"SPOILERS AHEAD\". Huge clean readable condensed angular metallic silver-white capitals with black extrusion and thin electric crimson red keyline. Gothic malware cybercore visual family: glossy off-black polarized glass shards, red pixel-corruption fringe, terminal corner brackets, cable hooks; small subordinate emblem of a red warning triangle with a forward timeline arrow. Palette only silver-white, off-black, crimson. Compact 5:1 horizontal silhouette, modest transparent margins, legible at 480px wide. No character, scene, subtitles, extra words or watermark. Truly transparent alpha outside the isolated title assembly, no solid backdrop, no fake checkerboard.",
+      "file": "spoilers-ahead.png"
+    },
+    {
+      "slug": "notebook-and-lore",
+      "text": "NOTEBOOK & LORE",
+      "prompt": "Use case: logo-brand. Create one transparent PNG horizontal feature-title banner for KazzWare README, exact text \"NOTEBOOK & LORE\" including the ampersand. Huge clean readable condensed angular metallic silver-white capitals with black extrusion and thin electric crimson red keyline. Gothic malware cybercore visual family: glossy off-black polarized glass shards, red pixel-corruption fringe, terminal corner brackets, cable hooks; small subordinate emblem of an open archival book with a red circuit bookmark. Palette only silver-white, off-black, crimson. Compact 5:1 horizontal silhouette, modest transparent margins, legible at 480px wide. No character, scene, subtitles, extra words or watermark. Truly transparent alpha outside the isolated title assembly, no solid backdrop, no fake checkerboard.",
+      "file": "notebook-and-lore.png"
+    },
+    {
+      "slug": "chat-names",
+      "text": "CHAT NAMES",
+      "prompt": "Use case: logo-brand. Create one transparent PNG horizontal feature-title banner for KazzWare README, exact text \"CHAT NAMES\". Huge clean readable condensed angular metallic silver-white capitals with black extrusion and thin electric crimson red keyline. Gothic malware cybercore visual family: glossy off-black polarized glass shards, red pixel-corruption fringe, terminal corner brackets, cable hooks; small subordinate emblem of a file-name tag and blinking cursor. Palette only silver-white, off-black, crimson. Compact 5:1 horizontal silhouette, modest transparent margins, legible at 480px wide. No character, scene, subtitles, extra words or watermark. Truly transparent alpha outside the isolated title assembly, no solid backdrop, no fake checkerboard.",
+      "file": "chat-names.png"
+    },
+    {
+      "slug": "commentary",
+      "text": "COMMENTARY",
+      "prompt": "Use case: logo-brand. Create one transparent PNG horizontal feature-title banner for KazzWare README, exact text \"COMMENTARY\". Huge clean readable condensed angular metallic silver-white capitals with black extrusion and thin electric crimson red keyline. Gothic malware cybercore visual family: glossy off-black polarized glass shards, red pixel-corruption fringe, terminal corner brackets, cable hooks; small subordinate emblem of a speech bubble with a mischievous red grin and a small audio waveform. Palette only silver-white, off-black, crimson. Compact 5:1 horizontal silhouette, modest transparent margins, legible at 480px wide. No character, scene, subtitles, extra words or watermark. Truly transparent alpha outside the isolated title assembly, no solid backdrop, no fake checkerboard.",
+      "file": "commentary.png"
+    }
+  ]
+}
