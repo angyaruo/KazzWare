@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.1 — Damaged terminal interface
+
+- Recreate the supplied interface reference with scalable screen housings: chipped red edges, cable loops, scanlines, surface grain, barcodes, warning symbols and small hardware LEDs. Keep Editor, Chat and Commentary on distressed off-white panels, with the other tools on dark screens.
+- Preserve the nine working Home destinations around the original Kazz artwork. Increase label/icon size, add a local live date/time on Home, and keep the active chat name in tool headers. Keep the connection shortcut visible after setup.
+- Carry red accents into readable tool surfaces without placing grunge over form text. Keep keyboard focus, drag handles, mobile peeking, transparent gaps, short-viewport scrolling and reduced-motion support.
+- Use local SVG/CSS only, with no added image downloads, dependencies, permissions or storage changes. Rebuild the tracked frontend and sample preview; retain all existing behavior tests.
+
 ## 0.7.0 — Compact glass UI and mobile peeker
 
 - Replace the large, text-heavy home tiles with nine compact icon-and-label buttons around Kazz. Use charcoal/silver smoked glass, red hover/focus/press glow and readable work surfaces. Keep transparent gaps and a scroll-free home at checked portrait phone sizes.
