@@ -4,7 +4,8 @@
 
 - Give Home buttons the shallow top notch, small beveled corners and straight sides of the supplied Flashlight/Maps reference. Use cool off-black polarized glass, a fine red outline and a faint idle halo across all nine destinations.
 - Sweep a glass reflection across hovered, focused or pressed controls. Brighten the edge on interaction; retain a separate keyboard focus ring and disable motion when reduced motion is requested. Keep navigation immediate.
-- Preserve the compact layout around the original Kazz artwork. Add local live date/time on Home, keep the active chat name in tool headers and keep the connection shortcut visible after setup. Carry the same glass treatment onto the header, shortcut and status strip.
+- Arrange the buttons in an asymmetric fan around the original Kazz artwork, following the owner's sketch: mild tilts at the top, stronger outward angles and inward positions below, and Commentary at the foot. Tilt the Home header and window controls, while tool headers stay level. Preserve the 400×550 maximum Home footprint and separate touch targets.
+- Add local live date/time on Home, keep the active chat name in tool headers and keep the connection shortcut visible after setup. Carry the same glass treatment onto the header, shortcut and status strip.
 - Keep readable tool surfaces, drag handles, mobile peeking, transparent gaps and short-viewport scrolling. Use local SVG/CSS only, with no new image downloads, dependencies, permissions or storage changes. Rebuild the tracked frontend and sample preview; retain all existing behavior tests.
 
 ## 0.7.0 — Compact glass UI and mobile peeker

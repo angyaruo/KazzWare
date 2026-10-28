@@ -265,32 +265,38 @@ ${controls}:active:enabled::after { opacity:1; background:#ff9aa9 }
 .quick-settings svg { width:23px; height:23px }
 .close { font-size:29px; line-height:1 }
 
+/* Home is a fan around Kazz. Tool headers stay level for reading and forms. */
+[data-screen=home] .top { padding:18px 10px 12px; min-height:96px }
+[data-screen=home] .title { min-height:64px; padding:12px; transform:rotate(-7deg) }
+[data-screen=home] .system-clock { margin-top:6px }
+[data-screen=home] .quick-settings { margin-top:4px; transform:rotate(7deg) }
+[data-screen=home] .close { margin-top:11px; transform:rotate(12deg) }
 [data-screen=home] .body { overflow:auto; padding:8px 6px 0 }
-.orbit { height:342px; margin:0 3px }
+.orbit { height:348px; margin:0 3px }
 .orbit-ring { display:none }
-.orbit-kazz { top:16px; left:16%; width:72%; height:285px; filter:drop-shadow(0 3px 3px #000b) }
+.orbit-kazz { top:10px; left:14%; width:74%; height:271px; filter:drop-shadow(0 3px 3px #000b) }
 .shard {
-  position:absolute; width:34%; min-height:62px; padding:13px 7px 10px; gap:6px;
-  font:900 18px/1.05 var(--display); letter-spacing:.35px; transform:none;
+  position:absolute; width:32%; min-height:44px; padding:5px 7px; gap:6px;
+  font:900 18px/1.05 var(--display); letter-spacing:.35px; transform:rotate(var(--tilt));
 }
-.shard svg { width:24px; height:24px; filter:none }
+.shard svg { width:21px; height:21px; filter:none }
 .shard span { font-weight:900 }
 .shard:hover:enabled { translate:0 -1px }
 .shard:active:enabled { translate:0 1px }
-.shard-edit { left:0; top:3px }
-.shard-swipes { right:0; top:5px }
-.shard-slop { left:0; top:86px; width:31%; height:65px; flex-direction:column; gap:3px }
-.shard-chat { right:0; top:93px; width:30%; height:64px; flex-direction:column; gap:3px }
-.shard-gallery { left:0; top:168px; width:32%; height:64px; flex-direction:column; gap:3px }
-.shard-timeline { right:0; top:178px; width:32%; height:65px; flex-direction:column; gap:3px }
-.shard-notebook { left:0; top:253px; width:33%; height:68px; flex-direction:column; gap:3px }
-.shard-naming { right:0; top:260px; width:33%; height:66px; flex-direction:column; gap:3px }
-.shard-commentary { left:34%; top:281px; width:32%; height:61px; flex-direction:column; gap:3px; font-size:17px }
-.shard-commentary svg { width:22px; height:22px }
+.shard-edit { left:1.5%; top:10px; height:54px; --tilt:7deg }
+.shard-swipes { right:1.5%; top:3px; height:54px; --tilt:-8deg }
+.shard-slop { left:2%; top:84px; width:29%; height:54px; flex-direction:column; gap:3px; --tilt:-6deg }
+.shard-chat { right:2%; top:80px; width:29%; height:54px; flex-direction:column; gap:3px; --tilt:5deg }
+.shard-gallery { left:4.5%; top:155px; width:29%; height:54px; flex-direction:column; gap:3px; --tilt:-17deg }
+.shard-timeline { right:4.5%; top:152px; width:29%; height:54px; flex-direction:column; gap:3px; --tilt:17deg }
+.shard-notebook { left:10%; top:230px; width:29%; height:52px; flex-direction:column; gap:3px; --tilt:-27deg }
+.shard-naming { right:10%; top:226px; width:29%; height:52px; flex-direction:column; gap:3px; --tilt:27deg }
+.shard-commentary { left:34%; top:292px; width:32%; height:52px; gap:2px; flex-direction:column; font-size:17px; --tilt:-3deg }
+.shard-commentary svg { width:20px; height:20px }
 .feature-light { top:12px; right:9px; width:5px; height:5px; background:#080c12; border-color:#a4aeb9; opacity:.65 }
 .feature-light.on { background:#ff4861; border-color:#ff8a9c; box-shadow:0 0 5px #ff173b90; opacity:1 }
-.plug { display:block; width:80%; margin:11px auto 0; min-height:47px; padding:12px 20px; font:900 19px/1.2 var(--display); letter-spacing:.5px }
-.status { min-height:32px; padding:11px 16px; color:#c7d0da; font:10px/1.45 var(--mono); margin:4px 6px 6px; max-width:calc(100% - 12px) }
+.plug { display:block; width:80%; margin:5px auto 0; min-height:44px; padding:11px 20px; font:900 19px/1.2 var(--display); letter-spacing:.5px }
+.status { min-height:32px; padding:8px 16px; color:#c7d0da; font:10px/1.45 var(--mono); margin:4px 6px 6px; max-width:calc(100% - 12px) }
 .status span { position:relative }
 .status.error { border:0; color:#ffadbb }
 .status.error::after { opacity:1 }

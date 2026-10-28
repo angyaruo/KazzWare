@@ -3,7 +3,7 @@
 ## Confirmed locally
 
 - Windows x64; Bun 1.4.4, Node 22.15.1, TypeScript 5.9.3, Spindle SDK 0.6.49. No new dependencies or permissions in this release.
-- `npm run check`: type checking, **73 tests / 389 assertions across eight files**, and both tracked ESM bundles passed. Backend: 57,399 bytes; frontend: 15,367,284 bytes, including original owner artwork and local font.
+- `npm run check`: type checking, **73 tests / 389 assertions across eight files**, and both tracked ESM bundles passed. Backend: 57,399 bytes; frontend: 15,367,896 bytes, including original owner artwork and local font.
 - The backend is unchanged from 0.7.0. The exact backend scanner from Lumiverse main `3d74148383dded2b379f204532cf375b52bcd201` accepts the bundle without capability exemptions; its prohibited-call negative control passed.
 - `git diff --check` passed. Preview rebuilt from the shipped frontend. Runtime/source ZIPs are packaged from tracked release files after commit.
 
@@ -14,6 +14,8 @@ Frontend tests exercise the real frontend/service with deterministic host/model 
 ## Rendered preview checks
 
 The shipped frontend was exercised in the in-app browser at 1280×720 desktop and responsive 390×844 and 320×700 viewports. Home showed all nine destinations, the header, connection shortcut and footer without internal scrolling at both portrait phone widths; button text widths did not overflow at 320 pixels. All nine destinations opened at 320 pixels without horizontal overflow. Checked the notched silhouette, off-black glass fill and red idle edge. A hovered settings control showed its visible reflection, the 0.68-second sweep animation and full edge opacity (0.5 at rest); keyboard focus also triggered the sweep and retained a separate 2-pixel ring. At 700×390, Home used its scrolling fallback and the connection shortcut remained reachable. Tools retain scrolling. Original transparent Kazz art and the existing mobile peeker remain unchanged. Reduced-motion rules were inspected in source; physical touch remains a live smoke check.
+
+The final fan arrangement was additionally checked at desktop and 320×700: all nine destinations opened, labels fit their untransformed boxes, and geometry calculated from the rendered transforms found no intersecting button rectangles. Home retained its 400×550 maximum footprint and fit without internal scrolling. Lower buttons use stronger rotations and move inward; tool headers remain level for reading. The glow/shine rules are unchanged from the glass checks above.
 
 The preview is sample-only and deterministic: no AI requests, Lumiverse API calls or production chat writes. Its manual handlers demonstrate layout and interaction; backend tests validate real automation counters and interception. This is not physical-touch-device or end-to-end live-provider evidence. Native integration, provider quality/latency and prompt effects still need a live smoke pass after installation.
 
