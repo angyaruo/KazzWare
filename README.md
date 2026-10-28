@@ -12,9 +12,9 @@ A chat-bound companion extension for Lumiverse, built around Kazz: a foul-mouthe
 - Peanut Gallery is opt-in and produces interactive fictional pages at a configurable message interval.
 - The user chooses Kazz's model connection; working state follows the active chat.
 
-## Alpha · 0.7.0
+## Alpha · 0.7.1
 
-The implementation and prebuilt bundles are included. A compact ring of nine icon-and-label buttons surrounds Kazz, with transparent gaps over the native chat. Smoked glass surfaces use charcoal and silver, with red glow on hover, focus and press. Work tools have their own readable surfaces; no outer panel encloses the companion. Automated tests cover the backend and real frontend handlers; the shipped frontend also has an interactive sample preview. Live model response quality and physical mobile-device behavior still need validation. See [verification](docs/VERIFICATION.md) for exact checks and remaining limits.
+The implementation and prebuilt bundles are included. Nine icon-and-label buttons fan around Kazz at different angles, with transparent gaps over the native chat. The owner's Flashlight/Maps reference informs the straight-sided panels, small beveled corners and shallow top notch; their drawn layout informs the asymmetric arrangement and tilted Home header. Cool off-black polarized glass has a faint red edge at rest, a brighter outline on interaction and a sweeping reflection on hover, focus or press. Home shows local date/time; tools show the current chat name and keep level headers and readable surfaces. Automated tests cover the backend and real frontend handlers; the shipped frontend also has an interactive sample preview. Live model response quality and physical mobile-device behavior still need validation. See [verification](docs/VERIFICATION.md) for exact checks and remaining limits.
 
 Kazz floats in the active chat. Tap him or the input-bar KazzWare action to open the menu beside his current position. Opening, navigating or closing it preserves his position. Drag the desktop mascot freely; on phones, a smaller peeking Kazz docks to the nearest screen edge when released. Settings can restore the round phone launcher. Drag the open menu by the KAZZWARE label or its large Kazz artwork. The title and launcher also accept arrow keys (Shift for larger steps). Home fits typical portrait phone viewports without internal scrolling; tools scroll when needed, and short viewports retain a scrolling fallback. Opening the menu hides the launcher while the larger companion is on screen.
 
@@ -53,7 +53,7 @@ Requires **Lumiverse 1.2.5+**, its required **Bun 1.4.4+** runtime, and a config
 
 Open a chat, open KazzWare → Settings, select a connection and save. Gallery, commentary, automatic naming, automatic timeline summaries and both injection controls start disabled. Generation uses your selected provider; long summaries may use several calls. Automatic features require an open, active KazzWare frontend.
 
-**Updating:** once 0.7.0 is on your installed branch, update KazzWare in the extension manager, restart the extension and refresh the Lumiverse page. Confirm its card shows **0.7.0**. Existing data migrates without a reset; no new permissions or dependencies are added in this release. If upgrading from before 0.6.0, grant **Interceptor** for timeline/future-beat prompt injection. If that permission is denied, other tools still work. The HTTP startup fix from 0.1.1 is included.
+**Updating:** once 0.7.1 is on your installed branch, update KazzWare in the extension manager, restart the extension and refresh the Lumiverse page. Confirm its card shows **0.7.1**. Existing data is preserved; no new permissions or dependencies are added in this release. If upgrading from before 0.6.0, grant **Interceptor** for timeline/future-beat prompt injection. If that permission is denied, other tools still work. The HTTP startup fix from 0.1.1 is included.
 
 ## Data and scope
 

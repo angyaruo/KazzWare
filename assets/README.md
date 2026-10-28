@@ -12,6 +12,8 @@ The nine PNGs were supplied by the project owner as KazzWare's mascot references
 
 The owner’s two hand-drawn layouts inform the floating composition. Those reference drawings are not shipped.
 
+The owner's later Flashlight/Maps screenshot informs the notched panel silhouette in 0.7.1, and their subsequent fan-menu sketch informs the tilted arrangement around Kazz. Cool polarized glass, red edges and animated reflections are drawn with original local SVG/CSS in `src/chrome.ts`; reference screenshots are not shipped as flattened interfaces. Labels and controls remain native HTML elements.
+
 The project owner has not granted a public redistribution license for this artwork. Do not treat dependency licenses as a license to the mascot images.
 
 ## Display typeface

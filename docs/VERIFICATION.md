@@ -1,25 +1,27 @@
-# Alpha 0.7.0 verification · 2026-10-27
+# Alpha 0.7.1 verification · 2026-10-27
 
 ## Confirmed locally
 
 - Windows x64; Bun 1.4.4, Node 22.15.1, TypeScript 5.9.3, Spindle SDK 0.6.49. No new dependencies or permissions in this release.
-- `npm run check`: type checking, **73 tests / 389 assertions across eight files**, and both tracked ESM bundles passed. Backend: 57,399 bytes; frontend: 15,358,548 bytes, including original owner artwork and local font.
-- The exact backend scanner from Lumiverse main `3d74148383dded2b379f204532cf375b52bcd201` accepts the bundle without capability exemptions; its prohibited-call negative control passed.
+- `npm run check`: type checking, **73 tests / 389 assertions across eight files**, and both tracked ESM bundles passed. Backend: 57,399 bytes; frontend: 15,367,896 bytes, including original owner artwork and local font.
+- The backend is unchanged from 0.7.0. The exact backend scanner from Lumiverse main `3d74148383dded2b379f204532cf375b52bcd201` accepts the bundle without capability exemptions; its prohibited-call negative control passed.
 - `git diff --check` passed. Preview rebuilt from the shipped frontend. Runtime/source ZIPs are packaged from tracked release files after commit.
 
-New regressions cover all nine Home destinations, dedicated Commentary/Chat names/Swipes controls, staying in Swipes after a native pick, mobile edge docking and restoration of desktop placement. Commentary tests cover preference bounds and persistence, unique-event counting, skipped events without provider calls, duplicate delivery, counter resets, until-closed bubbles and expiry after changing duration.
+This is a presentation update; no new tests mirror the decorative CSS. The existing suite covers all nine Home destinations, Commentary/Chat names/Swipes controls, native picking, mobile docking/desktop restoration, commentary settings/counters and expiry.
 
 Frontend tests exercise the real frontend/service with deterministic host/model fakes. All earlier swipe merge/Undo, title conflict protection, Summary+/future-beat injection, highlight timing, exact-range Undo, drag/position, chat switching, Gallery, assistant, notebook and isolation tests still pass.
 
 ## Rendered preview checks
 
-The shipped frontend was exercised in the in-app browser at 1280×720 desktop and responsive 390×844 and 320×700 viewports. Home showed all nine destinations without internal overflow at both phone widths. Checked glass edges/red interaction glow, direct feature navigation, commentary switches/size/duration controls and sample bubbles, naming interval/save/manual naming/Undo, swipe loading, chat and timeline readability. The peeker measured 64×84, docked to both edges after dragging and retained its position when the menu opened. Tool content remains scrollable; gaps around the home buttons keep the native chat visible.
+The shipped frontend was exercised in the in-app browser at 1280×720 desktop and responsive 390×844 and 320×700 viewports. Home showed all nine destinations, the header, connection shortcut and footer without internal scrolling at both portrait phone widths; button text widths did not overflow at 320 pixels. All nine destinations opened at 320 pixels without horizontal overflow. Checked the notched silhouette, off-black glass fill and red idle edge. A hovered settings control showed its visible reflection, the 0.68-second sweep animation and full edge opacity (0.5 at rest); keyboard focus also triggered the sweep and retained a separate 2-pixel ring. At 700×390, Home used its scrolling fallback and the connection shortcut remained reachable. Tools retain scrolling. Original transparent Kazz art and the existing mobile peeker remain unchanged. Reduced-motion rules were inspected in source; physical touch remains a live smoke check.
+
+The final fan arrangement was additionally checked at desktop and 320×700: all nine destinations opened, labels fit their untransformed boxes, and geometry calculated from the rendered transforms found no intersecting button rectangles. Home retained its 400×550 maximum footprint and fit without internal scrolling. Lower buttons use stronger rotations and move inward; tool headers remain level for reading. The glow/shine rules are unchanged from the glass checks above.
 
 The preview is sample-only and deterministic: no AI requests, Lumiverse API calls or production chat writes. Its manual handlers demonstrate layout and interaction; backend tests validate real automation counters and interception. This is not physical-touch-device or end-to-end live-provider evidence. Native integration, provider quality/latency and prompt effects still need a live smoke pass after installation.
 
 ## Live smoke test after update
 
-1. Merge/update to 0.7.0, restart KazzWare and refresh Lumiverse. Confirm the version and existing saved data. No additional permissions should appear when upgrading from 0.6.0. Select Kazz's connection if needed.
+1. Merge/update to 0.7.1, restart KazzWare and refresh Lumiverse. Confirm the version and existing saved data. No additional permissions should appear when upgrading from 0.7.0. Select Kazz's connection if needed.
 2. Check all nine Home buttons, red hover/press feedback, keyboard focus, text contrast over different chat backgrounds and reduced-motion settings. On a physical phone, drag the peeker to either edge, open/close tools, rotate the screen and open the keyboard. Toggle back to the round launcher in Settings and verify menu anchoring.
 3. Open Commentary from Home. Try interval 2, each bubble size, a short timed bubble and Until closed. Verify skipped/duplicate events do not replace the current bubble, unseen swipes advance the interval once, and disabling/chat switching clears the bubble. Try Chat names from Home: first-message naming, 10-message updates, manual naming and Undo; swipes/edits must not advance its count.
 4. Open Swipes from Home, pick a native message and choose two or more replies. Try blank and explicit directions. Verify a new active swipe, preserved originals and Undo; confirm a newer manual edit blocks an old merge Undo.

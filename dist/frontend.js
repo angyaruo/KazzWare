@@ -143,6 +143,7 @@ function renderFeatureControls(body, ui, feature, draft, onDraft) {
 
 // src/icons.ts
 var paths = {
+  settings: '<path d="m10 2-.6 3-2 .9-2.6-1.1L2 8.2l2.3 2v2.6l-2.3 2 2.2 3.5 2.9-1 2.2 1.2.7 3.5h4l.7-3.5 2.2-1.2 2.9 1 2.2-3.5-2.3-2v-2.6l2.3-2-2.8-3.4-2.6 1.1-2-.9L14 2Z"/><circle cx="12" cy="12" r="3.5"/>',
   edit: '<path d="m15 4 5 5M4 20l5-1L21 7a2 2 0 0 0-5-5L4 14Z"/>',
   swipes: '<path d="M4 4v4c0 5 12 3 12 8v4M20 4v4c0 5-12 3-12 8v4M13 17l3 3 3-3"/>',
   slop: '<path d="m15 3 6 6-11 11H5l-3-3Zm-7 7 6 6M10 20h11"/>',
@@ -188,6 +189,150 @@ function submitComment(form){var input=form.querySelector('textarea');if(!input.
 </script></body></html>`;
 }
 
+// src/chrome.ts
+var edge = `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 80" preserveAspectRatio="none"><path d="M3 1H65L70 5H123L128 1H157L159 3V77L157 79H3L1 77V3Z" fill="none" stroke="white" stroke-width="1.15" vector-effect="non-scaling-stroke"/><path d="m7 69 5-5m-5 9 9-9m-5 9 5-5" fill="none" stroke="white" stroke-width="1" opacity=".45" vector-effect="non-scaling-stroke"/></svg>`)}")`;
+var surfaces = ":is(.shard,.plug,.quick-settings,.close,.title,.status)";
+var controls = ":is(.shard,.plug,.quick-settings,.close)";
+var CHROME_CSS = `
+:host {
+  --ink:#0b1015; --paper:#e7edf2; --glow:#ff2948;
+  --panel-cut:polygon(1.875% 1.25%,40.625% 1.25%,43.75% 6.25%,76.875% 6.25%,80% 1.25%,98.125% 1.25%,99.375% 3.75%,99.375% 96.25%,98.125% 98.75%,1.875% 98.75%,.625% 96.25%,.625% 3.75%);
+}
+
+/* The outer element stays unclipped so its red halo and focus ring can escape.
+   Decorative layers ignore input; labels and icons remain live controls. */
+${surfaces} {
+  position:relative; isolation:isolate; overflow:visible; border:0; border-radius:0;
+  background:transparent; color:var(--paper); box-shadow:none;
+  filter:drop-shadow(0 3px 4px #0009) drop-shadow(0 0 3px #ff173b24);
+  transition:filter .18s ease,translate .15s ease;
+}
+${surfaces}::before,${surfaces}::after {
+  content:''; position:absolute; inset:0; z-index:-1; border-radius:0; pointer-events:none;
+}
+${surfaces}::before {
+  clip-path:var(--panel-cut);
+  background-image:
+    linear-gradient(112deg,transparent 40%,#d7ecff05 44%,#edfbff38 49%,#ffffff5c 50%,#d7ecff14 53%,transparent 59%),
+    linear-gradient(128deg,#9cbedb17,transparent 32%,#0003 48%,#b4c7e00b 49%,transparent 65%),
+    linear-gradient(165deg,#151e27f0,#080c12f2 70%,#111721f0);
+  background-size:300% 100%,100% 100%,100% 100%;
+  background-position:100% 0,0 0,0 0; background-repeat:no-repeat;
+  backdrop-filter:blur(12px) saturate(.35); -webkit-backdrop-filter:blur(12px) saturate(.35);
+}
+${surfaces}::after {
+  clip-path:none; background:#ff3657; opacity:.5;
+  mask:${edge} center/100% 100% no-repeat; -webkit-mask:${edge} center/100% 100% no-repeat;
+  transition:opacity .18s ease,background .18s ease;
+}
+${controls}:hover:enabled,${controls}:focus-visible {
+  color:#f6faff; background:transparent; border:0; box-shadow:none;
+  filter:drop-shadow(0 3px 4px #0009) drop-shadow(0 0 5px #ff173b65);
+}
+${controls}:hover:enabled::after,${controls}:focus-visible::after,.title:focus-visible::after { opacity:1; background:#ff546b }
+${controls}:focus-visible,.title:focus-visible { outline:2px solid #ff8294; outline-offset:3px }
+${controls}:focus-visible::before { animation:glass-gleam .68s ease-out }
+@media (hover:hover) {
+  ${controls}:hover:enabled::before { animation:glass-gleam .68s ease-out }
+}
+${controls}:active:enabled {
+  translate:0 1px; background:transparent; color:white; box-shadow:none; animation:none;
+  filter:drop-shadow(0 0 7px #ff173b99);
+}
+${controls}:active:enabled::before { animation:glass-press .38s ease-out }
+${controls}:active:enabled::after { opacity:1; background:#ff9aa9 }
+@keyframes glass-gleam {
+  from { background-position:100% 0,0 0,0 0 }
+  to { background-position:0% 0,0 0,0 0 }
+}
+@keyframes glass-press {
+  from { background-position:72% 0,0 0,0 0 }
+  to { background-position:0% 0,0 0,0 0 }
+}
+
+.top { gap:8px; padding:2px 6px 8px; min-height:82px; align-items:flex-start }
+.title { width:236px; max-width:calc(100% - 104px); min-height:74px; padding:17px 12px 12px }
+.brand-line { display:flex; align-items:center; gap:7px; padding:0; background:none; border:0; border-radius:0; box-shadow:none; white-space:nowrap }
+.brand { font:900 27px/1 var(--display); letter-spacing:1px; color:#e7edf2; text-shadow:none }
+.brand em { color:var(--glow); font:700 13px/1 var(--mono); margin-left:2px; letter-spacing:-1px }
+.hazard { font:23px/1 system-ui; color:var(--glow) }
+.system-clock { display:block; margin:9px 0 0; font:9px/1.2 var(--mono); color:#acb7c2; white-space:nowrap }
+.chat-name { display:none }
+.shell:not([data-screen=home]) .system-clock { display:none }
+.shell:not([data-screen=home]) .chat-name { display:block; max-width:100%; margin-top:9px; padding:0; background:none; font:10px/1.2 var(--mono) }
+.top .badge { display:none }
+.icon,.quick-settings { width:44px; height:48px; min-height:44px; flex-shrink:0; padding:10px; color:#d9e0e8 }
+.quick-settings svg { width:23px; height:23px }
+.close { font-size:29px; line-height:1 }
+
+/* Home is a fan around Kazz. Tool headers stay level for reading and forms. */
+[data-screen=home] .top { padding:18px 10px 12px; min-height:96px }
+[data-screen=home] .title { min-height:64px; padding:12px; transform:rotate(-7deg) }
+[data-screen=home] .system-clock { margin-top:6px }
+[data-screen=home] .quick-settings { margin-top:4px; transform:rotate(7deg) }
+[data-screen=home] .close { margin-top:11px; transform:rotate(12deg) }
+[data-screen=home] .body { overflow:auto; padding:8px 6px 0 }
+.orbit { height:348px; margin:0 3px }
+.orbit-ring { display:none }
+.orbit-kazz { top:10px; left:14%; width:74%; height:271px; filter:drop-shadow(0 3px 3px #000b) }
+.shard {
+  position:absolute; width:32%; min-height:44px; padding:5px 7px; gap:6px;
+  font:900 18px/1.05 var(--display); letter-spacing:.35px; transform:rotate(var(--tilt));
+}
+.shard svg { width:21px; height:21px; filter:none }
+.shard span { font-weight:900 }
+.shard:hover:enabled { translate:0 -1px }
+.shard:active:enabled { translate:0 1px }
+.shard-edit { left:1.5%; top:10px; height:54px; --tilt:7deg }
+.shard-swipes { right:1.5%; top:3px; height:54px; --tilt:-8deg }
+.shard-slop { left:2%; top:84px; width:29%; height:54px; flex-direction:column; gap:3px; --tilt:-6deg }
+.shard-chat { right:2%; top:80px; width:29%; height:54px; flex-direction:column; gap:3px; --tilt:5deg }
+.shard-gallery { left:4.5%; top:155px; width:29%; height:54px; flex-direction:column; gap:3px; --tilt:-17deg }
+.shard-timeline { right:4.5%; top:152px; width:29%; height:54px; flex-direction:column; gap:3px; --tilt:17deg }
+.shard-notebook { left:10%; top:230px; width:29%; height:52px; flex-direction:column; gap:3px; --tilt:-27deg }
+.shard-naming { right:10%; top:226px; width:29%; height:52px; flex-direction:column; gap:3px; --tilt:27deg }
+.shard-commentary { left:34%; top:292px; width:32%; height:52px; gap:2px; flex-direction:column; font-size:17px; --tilt:-3deg }
+.shard-commentary svg { width:20px; height:20px }
+.feature-light { top:12px; right:9px; width:5px; height:5px; background:#080c12; border-color:#a4aeb9; opacity:.65 }
+.feature-light.on { background:#ff4861; border-color:#ff8a9c; box-shadow:0 0 5px #ff173b90; opacity:1 }
+.plug { display:block; width:80%; margin:5px auto 0; min-height:44px; padding:11px 20px; font:900 19px/1.2 var(--display); letter-spacing:.5px }
+.status { min-height:32px; padding:8px 16px; color:#c7d0da; font:10px/1.45 var(--mono); margin:4px 6px 6px; max-width:calc(100% - 12px) }
+.status span { position:relative }
+.status.error { border:0; color:#ffadbb }
+.status.error::after { opacity:1 }
+
+.workbench { background:linear-gradient(125deg,#8da6c00b,transparent 45%),#0e1319f5; border-color:#63303e; border-radius:3px 12px 3px 3px; box-shadow:inset 0 1px #bdcfe314,0 5px 20px #0008 }
+.section-head { border-color:#39404a }
+.section-head h2 { letter-spacing:.6px }
+nav button[data-tab=home] { border-color:#733242; border-radius:3px 10px 3px 3px; background:#0e1319 }
+.feature-toggle,.history,.chat-compose { border-radius:3px 12px 3px 3px; border-color:#454c58 }
+.feature-toggle { background:#161c24 }
+.phone { border-color:#62404a }
+.chat-taunt { border-radius:3px 12px 3px 3px }
+.bubble { border-color:#47505c }
+.bubble.user { background:#e3e7ed; border-color:#e3e7ed }
+.note { border-left-color:var(--glow) }
+
+@container kazz (max-width:340px) {
+  .top { gap:4px; min-height:77px }
+  .title { max-width:calc(100% - 96px); min-height:72px; padding:17px 10px 12px }
+  .brand { font-size:23px; letter-spacing:.5px }
+  .brand em { font-size:11px }
+  .hazard { font-size:20px }
+  .brand-line { gap:4px }
+  .system-clock { font-size:8px; margin-top:8px }
+  .shard { font-size:16px; padding-left:6px; padding-right:6px }
+  .shard svg { width:21px; height:21px }
+  .shard-commentary { font-size:15px }
+  .orbit-kazz { left:14%; width:77% }
+  .plug { font-size:17px; width:85% }
+}
+@media (prefers-reduced-motion:reduce) {
+  ${surfaces},${surfaces}::before,${surfaces}::after { animation:none!important; transition:none!important }
+  .shard:hover:enabled,.shard:active:enabled { translate:none }
+}
+`;
+
 // src/style.ts
 var CSS = `
 :host{--ink:#17191d;--glow:#ff3b58;--paper:#eceef0;--ice:var(--paper);--red:var(--paper);--acid:var(--paper);--display:KazzDisplay,Impact,'Arial Narrow',sans-serif;--mono:ui-monospace,Consolas,monospace;display:block;height:100%;font:14px/1.5 system-ui,-apple-system,'Segoe UI',sans-serif;color:var(--paper);color-scheme:dark;pointer-events:none}
@@ -209,6 +354,7 @@ nav{display:flex;gap:8px;padding:2px 6px 9px;flex-shrink:0}nav button{pointer-ev
 @media(max-width:600px){input,textarea,select{font-size:16px}.body{padding:4px}.top{padding-top:max(4px,env(safe-area-inset-top))}.status{margin-bottom:max(6px,env(safe-area-inset-bottom))}}
 @media(max-height:470px){[data-screen=home] .body{overflow:auto}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+${CHROME_CSS}
 `;
 
 // src/message-targeting.ts
@@ -1029,7 +1175,7 @@ function setup(ctx) {
   let busy = 0;
   const pending = new Map;
   const mascot = positioned(ctx.ui.createFloatWidget({ width: 110, height: 110, initialPosition: { x: Math.max(0, window.innerWidth - 125), y: Math.max(0, window.innerHeight - 245) }, snapToEdge: false, chromeless: true, touchScrollMode: "native", tooltip: "KazzWare · your in-chat accomplice" }), 110, 110);
-  let panelWidth = Math.min(400, window.innerWidth - 16), panelHeight = Math.min(452, window.innerHeight - 24);
+  let panelWidth = Math.min(400, window.innerWidth - 16), panelHeight = Math.min(550, window.innerHeight - 24);
   const panel = positioned(ctx.ui.createFloatWidget({ width: panelWidth, height: panelHeight, initialPosition: { x: Math.max(8, window.innerWidth - 436), y: 12 }, snapToEdge: false, chromeless: true, touchScrollMode: "native", tooltip: "KazzWare" }), panelWidth, panelHeight);
   for (const widget of [mascot, panel]) {
     widget.root.style.width = "100%";
@@ -1044,7 +1190,19 @@ function setup(ctx) {
   const petButton = petRoot.querySelector("button");
   const petImage = petRoot.querySelector("img");
   const root = panel.root.attachShadow({ mode: "open" });
-  root.innerHTML = `<style>${CSS}${STORY_CSS}</style><section class="shell" data-screen="home" aria-label="KazzWare"><header class="top"><div class="title" role="button" tabindex="0" aria-label="Move KazzWare menu; drag or use arrow keys" title="Drag to move · arrow keys also work"><div class="brand-line"><span class="brand">KAZZWARE<em>.exe</em></span><span class="badge">FRIENDLY MALWARE</span></div><div class="chat-name"></div></div><button class="quick-settings" aria-label="Connection settings">⚙</button><button class="icon close" aria-label="Close KazzWare">×</button></header><nav aria-label="KazzWare sections"></nav><main class="body"></main><footer class="status" role="status" aria-live="polite"><span></span><button class="cancel-pick" hidden>Cancel pick</button><button class="cancel" hidden>Stop</button></footer></section>`;
+  root.innerHTML = `<style>${CSS}${STORY_CSS}</style><section class="shell" data-screen="home" aria-label="KazzWare"><header class="top"><div class="title" role="button" tabindex="0" aria-label="Move KazzWare menu; drag or use arrow keys" title="Drag to move · arrow keys also work"><div class="brand-line"><span class="hazard" aria-hidden="true">☣</span><span class="brand">KAZZWARE<em>.exe</em></span><span class="badge">FRIENDLY MALWARE</span></div><time class="system-clock"></time><div class="chat-name"></div></div><button class="quick-settings" aria-label="Connection settings">${icon("settings")}</button><button class="icon close" aria-label="Close KazzWare">×</button></header><nav aria-label="KazzWare sections"></nav><main class="body"></main><footer class="status" role="status" aria-live="polite"><span></span><button class="cancel-pick" hidden>Cancel pick</button><button class="cancel" hidden>Stop</button></footer></section>`;
+  const clock = root.querySelector(".system-clock");
+  const tickClock = () => {
+    const now = new Date;
+    clock.dateTime = now.toISOString();
+    clock.textContent = now.toLocaleString(undefined, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  };
+  tickClock();
+  const clockTimer = setInterval(() => {
+    if (opened)
+      tickClock();
+  }, 1000);
+  disposers.push(() => clearInterval(clockTimer));
   const body = root.querySelector(".body");
   const nav = root.querySelector("nav");
   const statusBox = root.querySelector(".status");
@@ -1175,6 +1333,7 @@ function setup(ctx) {
     const changed = next !== tab;
     stopPicking();
     tab = next;
+    tickClock();
     resize();
     if (!opened)
       openBeside(mascot, panel, panelWidth, panelHeight, launcher.width());
@@ -1471,7 +1630,7 @@ function setup(ctx) {
   const resize = (event) => {
     panel.setFullscreen(false);
     const width = Math.min(400, window.innerWidth - 16);
-    const height = Math.max(160, Math.min(tab === "home" ? view?.state.settings.connectionId ? 452 : 500 : 640, (window.visualViewport?.height || window.innerHeight) - 24));
+    const height = Math.max(160, Math.min(tab === "home" ? 550 : 640, (window.visualViewport?.height || window.innerHeight) - 24));
     panelWidth = width;
     panelHeight = height;
     panel.setSize(width, height);
@@ -1661,7 +1820,7 @@ function setup(ctx) {
   function renderHome() {
     const features = [["edit", "Editor"], ["swipes", "Swipes"], ["slop", "De-slop"], ["chat", "Chat"], ["gallery", "Gallery"], ["timeline", "Summary+"], ["notebook", "Notebook"], ["naming", "Chat names"], ["commentary", "Commentary"]];
     const s = view.state.settings;
-    body.innerHTML = `<div class="orbit"><div class="orbit-ring" aria-hidden="true"></div><img draggable="false" class="orbit-kazz" src="${kazz_perched_default}" alt="Kazz perched on his mechanical tail">${features.map(([key, label]) => `<button class="shard shard-${key}" data-go="${key}">${icon(key)}<span>${label}</span>${["commentary", "naming", "gallery"].includes(key) ? `<i class="feature-light ${s[key === "commentary" ? "commentaryEnabled" : key === "naming" ? "autoName" : "galleryEnabled"] ? "on" : ""}" aria-label="${s[key === "commentary" ? "commentaryEnabled" : key === "naming" ? "autoName" : "galleryEnabled"] ? "On" : "Off"}"></i>` : ""}</button>`).join("")}</div>${!s.connectionId ? '<button class="plug" data-go="settings">Choose a connection ↗</button>' : ""}`;
+    body.innerHTML = `<div class="orbit"><div class="orbit-ring" aria-hidden="true"></div><img draggable="false" class="orbit-kazz" src="${kazz_perched_default}" alt="Kazz perched on his mechanical tail">${features.map(([key, label]) => `<button class="shard shard-${key}" data-go="${key}">${icon(key)}<span>${label}</span>${["commentary", "naming", "gallery"].includes(key) ? `<i class="feature-light ${s[key === "commentary" ? "commentaryEnabled" : key === "naming" ? "autoName" : "galleryEnabled"] ? "on" : ""}" aria-label="${s[key === "commentary" ? "commentaryEnabled" : key === "naming" ? "autoName" : "galleryEnabled"] ? "On" : "Off"}"></i>` : ""}</button>`).join("")}</div><button class="plug" data-go="settings">${s.connectionId ? "Connection settings" : "Choose a connection"} ↗</button>`;
     body.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => show(b.dataset.go)));
   }
   function renderEditor() {

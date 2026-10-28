@@ -1,3 +1,4 @@
+import { CHROME_CSS } from './chrome';
 export const CSS = `
 :host{--ink:#17191d;--glow:#ff3b58;--paper:#eceef0;--ice:var(--paper);--red:var(--paper);--acid:var(--paper);--display:KazzDisplay,Impact,'Arial Narrow',sans-serif;--mono:ui-monospace,Consolas,monospace;display:block;height:100%;font:14px/1.5 system-ui,-apple-system,'Segoe UI',sans-serif;color:var(--paper);color-scheme:dark;pointer-events:none}
 *{box-sizing:border-box}button,input,textarea,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.45;cursor:wait}[hidden]{display:none!important}button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--glow);outline-offset:3px}::selection{background:var(--paper);color:var(--ink)}
@@ -18,4 +19,5 @@ nav{display:flex;gap:8px;padding:2px 6px 9px;flex-shrink:0}nav button{pointer-ev
 @media(max-width:600px){input,textarea,select{font-size:16px}.body{padding:4px}.top{padding-top:max(4px,env(safe-area-inset-top))}.status{margin-bottom:max(6px,env(safe-area-inset-bottom))}}
 @media(max-height:470px){[data-screen=home] .body{overflow:auto}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+${CHROME_CSS}
 `;

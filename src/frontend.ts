@@ -50,7 +50,7 @@ export function setup(ctx: SpindleFrontendContext): () => void {
   let pageId = ''; let frame: SpindleSandboxFrameHandle | undefined; let status = 'Open a chat to wake Kazz.'; let error = false; let busy = 0;
   const pending = new Map<string, { resolve: (result: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
   const mascot = positioned(ctx.ui.createFloatWidget({ width: 110, height: 110, initialPosition: { x: Math.max(0, window.innerWidth - 125), y: Math.max(0, window.innerHeight - 245) }, snapToEdge: false, chromeless: true, touchScrollMode: 'native', tooltip: 'KazzWare · your in-chat accomplice' }), 110, 110);
-  let panelWidth = Math.min(400, window.innerWidth - 16), panelHeight = Math.min(452, window.innerHeight - 24);
+  let panelWidth = Math.min(400, window.innerWidth - 16), panelHeight = Math.min(550, window.innerHeight - 24);
   const panel = positioned(ctx.ui.createFloatWidget({ width: panelWidth, height: panelHeight, initialPosition: { x: Math.max(8, window.innerWidth - 436), y: 12 }, snapToEdge: false, chromeless: true, touchScrollMode: 'native', tooltip: 'KazzWare' }), panelWidth, panelHeight);
   for (const widget of [mascot, panel]) { widget.root.style.width = '100%'; widget.root.style.height = '100%'; }
   panel.root.dataset.kazzwareSurface = '';
@@ -61,7 +61,10 @@ export function setup(ctx: SpindleFrontendContext): () => void {
   petRoot.innerHTML = `<style>${CSS}</style><button class="mascot" aria-label="Open KazzWare"><img draggable="false" alt="Kazz, a silver-haired cyber-scorpion companion"><span class="dot"></span></button>`;
   const petButton = petRoot.querySelector('button')!; const petImage = petRoot.querySelector('img')!;
   const root = panel.root.attachShadow({ mode: 'open' });
-  root.innerHTML = `<style>${CSS}${STORY_CSS}</style><section class="shell" data-screen="home" aria-label="KazzWare"><header class="top"><div class="title" role="button" tabindex="0" aria-label="Move KazzWare menu; drag or use arrow keys" title="Drag to move · arrow keys also work"><div class="brand-line"><span class="brand">KAZZWARE<em>.exe</em></span><span class="badge">FRIENDLY MALWARE</span></div><div class="chat-name"></div></div><button class="quick-settings" aria-label="Connection settings">⚙</button><button class="icon close" aria-label="Close KazzWare">×</button></header><nav aria-label="KazzWare sections"></nav><main class="body"></main><footer class="status" role="status" aria-live="polite"><span></span><button class="cancel-pick" hidden>Cancel pick</button><button class="cancel" hidden>Stop</button></footer></section>`;
+  root.innerHTML = `<style>${CSS}${STORY_CSS}</style><section class="shell" data-screen="home" aria-label="KazzWare"><header class="top"><div class="title" role="button" tabindex="0" aria-label="Move KazzWare menu; drag or use arrow keys" title="Drag to move · arrow keys also work"><div class="brand-line"><span class="hazard" aria-hidden="true">☣</span><span class="brand">KAZZWARE<em>.exe</em></span><span class="badge">FRIENDLY MALWARE</span></div><time class="system-clock"></time><div class="chat-name"></div></div><button class="quick-settings" aria-label="Connection settings">${icon('settings')}</button><button class="icon close" aria-label="Close KazzWare">×</button></header><nav aria-label="KazzWare sections"></nav><main class="body"></main><footer class="status" role="status" aria-live="polite"><span></span><button class="cancel-pick" hidden>Cancel pick</button><button class="cancel" hidden>Stop</button></footer></section>`;
+  const clock = root.querySelector<HTMLTimeElement>('.system-clock')!;
+  const tickClock = () => { const now = new Date(); clock.dateTime = now.toISOString(); clock.textContent = now.toLocaleString(undefined, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }); };
+  tickClock(); const clockTimer = setInterval(() => { if (opened) tickClock(); }, 1000); disposers.push(() => clearInterval(clockTimer));
   const body = root.querySelector<HTMLElement>('.body')!; const nav = root.querySelector('nav')!; const statusBox = root.querySelector<HTMLElement>('.status')!;
   const launcher = mascotLayout(mascot, petButton, petImage, () => view?.state.settings);
   const petDrag = draggable(petButton, mascot, launcher.settled), panelDrag = draggable(root.querySelector<HTMLElement>('.title')!, panel);
@@ -126,7 +129,7 @@ export function setup(ctx: SpindleFrontendContext): () => void {
     }
     catch { if (origin === binding && target?.id === id) { target = undefined; range = undefined; } }
   }
-  function show(next: Tab = tab) { const changed = next !== tab; stopPicking(); tab = next; resize(); if (!opened) openBeside(mascot, panel, panelWidth, panelHeight, launcher.width()); opened = true; panel.setVisible(!!chatId); render(); if (changed) body.scrollTop = 0; scheduleFollow(); }
+  function show(next: Tab = tab) { const changed = next !== tab; stopPicking(); tab = next; tickClock(); resize(); if (!opened) openBeside(mascot, panel, panelWidth, panelHeight, launcher.width()); opened = true; panel.setVisible(!!chatId); render(); if (changed) body.scrollTop = 0; scheduleFollow(); }
   function hide() { panelDrag.cancel(); for (const drag of artDrags) drag.cancel(); stopPicking(); opened = false; invalidateSelection(); clearTimeout(followTimer); markTarget(); panel.setVisible(false); paintStatus(); petButton.focus(); }
   petButton.addEventListener('click', () => opened ? hide() : show());
   root.querySelector('.close')!.addEventListener('click', hide);
@@ -262,7 +265,7 @@ export function setup(ctx: SpindleFrontendContext): () => void {
   const resize = (event?: Event) => {
     panel.setFullscreen(false);
     const width = Math.min(400, window.innerWidth - 16);
-    const height = Math.max(160, Math.min(tab === 'home' ? (view?.state.settings.connectionId ? 452 : 500) : 640, (window.visualViewport?.height || window.innerHeight) - 24));
+    const height = Math.max(160, Math.min(tab === 'home' ? 550 : 640, (window.visualViewport?.height || window.innerHeight) - 24));
     panelWidth = width; panelHeight = height; panel.setSize(width, height); launcher.sync(!!event);
     const pos = panel.getPosition();
     panel.moveTo(Math.max(8, Math.min(pos.x, window.innerWidth - width - 8)), Math.max(8, Math.min(pos.y, (window.visualViewport?.height || window.innerHeight) - height - 8)));
@@ -328,7 +331,7 @@ export function setup(ctx: SpindleFrontendContext): () => void {
   function renderHome() {
     const features: [Tab, string][] = [['edit', 'Editor'], ['swipes', 'Swipes'], ['slop', 'De-slop'], ['chat', 'Chat'], ['gallery', 'Gallery'], ['timeline', 'Summary+'], ['notebook', 'Notebook'], ['naming', 'Chat names'], ['commentary', 'Commentary']];
     const s = view!.state.settings;
-    body.innerHTML = `<div class="orbit"><div class="orbit-ring" aria-hidden="true"></div><img draggable="false" class="orbit-kazz" src="${perched}" alt="Kazz perched on his mechanical tail">${features.map(([key, label]) => `<button class="shard shard-${key}" data-go="${key}">${icon(key)}<span>${label}</span>${['commentary', 'naming', 'gallery'].includes(key) ? `<i class="feature-light ${s[key === 'commentary' ? 'commentaryEnabled' : key === 'naming' ? 'autoName' : 'galleryEnabled'] ? 'on' : ''}" aria-label="${s[key === 'commentary' ? 'commentaryEnabled' : key === 'naming' ? 'autoName' : 'galleryEnabled'] ? 'On' : 'Off'}"></i>` : ''}</button>`).join('')}</div>${!s.connectionId ? '<button class="plug" data-go="settings">Choose a connection ↗</button>' : ''}`;
+    body.innerHTML = `<div class="orbit"><div class="orbit-ring" aria-hidden="true"></div><img draggable="false" class="orbit-kazz" src="${perched}" alt="Kazz perched on his mechanical tail">${features.map(([key, label]) => `<button class="shard shard-${key}" data-go="${key}">${icon(key)}<span>${label}</span>${['commentary', 'naming', 'gallery'].includes(key) ? `<i class="feature-light ${s[key === 'commentary' ? 'commentaryEnabled' : key === 'naming' ? 'autoName' : 'galleryEnabled'] ? 'on' : ''}" aria-label="${s[key === 'commentary' ? 'commentaryEnabled' : key === 'naming' ? 'autoName' : 'galleryEnabled'] ? 'On' : 'Off'}"></i>` : ''}</button>`).join('')}</div><button class="plug" data-go="settings">${s.connectionId ? 'Connection settings' : 'Choose a connection'} ↗</button>`;
     body.querySelectorAll<HTMLButtonElement>('[data-go]').forEach(b => b.addEventListener('click', () => show(b.dataset.go as Tab)));
   }
   function renderEditor() {
