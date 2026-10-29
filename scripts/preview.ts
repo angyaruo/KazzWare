@@ -17,6 +17,7 @@ state.pages = ['forum', 'thread', 'wiki'].map((format, i) => ({ id: `page-${i}`,
   { id: `post-${i}-1`, author: ['u/definitely_not_elias', '@unreliable_narrator', 'The Midnight Archives'][i], title: ['I was keeping them safe. Mostly.', 'Your fave is a walking red flag.', 'The light that looks back'][i], body: 'He says the locked door is for our protection. He also has the only key. I am connecting some extremely inconvenient dots here.' },
   { id: `post-${i}-2`, author: 'moth_to_a_bad_idea', title: 'Okay, but hear me out.', body: 'The fog has better communication skills than this man. Still rooting for him, unfortunately.' },
 ] }));
+state.conversation.title = 'The lighthouse clues';
 state.summaries = [{ id: 'summary', text: 'The light turns inland at midnight. Elias keeps the only key. The broken panes are repaired by an unknown visitor.', messages: 24, throughMessage: 'm1', createdAt: Date.UTC(2026, 9, 24) }];
 const script = String.raw`
 const { setup } = await import(FRONTEND_URL);
@@ -33,6 +34,7 @@ const sourceHash=m=>JSON.stringify([m.swipe_id,m.content]);
 state.story.timeline=[{messageId:'m1',summary:'Elias holds the only key as the light turns inland.',storyDate:'Day 01',storyTime:'23:41',location:'Lighthouse entrance',characters:'Elias, Traveler'},{messageId:'m3',summary:'The light turns again. Something scrapes upstairs.',storyDate:'Day 01',storyTime:'23:44',location:'Stairwell',characters:'Elias, Traveler'},{messageId:'m5',summary:'Three knocks stop the exchange. Elias asks to answer.',storyDate:'Day 01',storyTime:'23:47',location:'Locked upper door',characters:'Elias'}].map((e,i)=>({...e,id:'note-'+i,swipe:0,sourceHash:sourceHash(messages.find(m=>m.id===e.messageId)),createdAt:Date.now(),manual:false}));
 state.story.spoilers=[{id:'future-1',text:'The person behind the door knows the traveler’s name.',afterMessages:null,anchor:'m5',status:'planned',reason:'Waiting for a quiet opening in the scene.',createdAt:Date.now()}];
 let customTitle='';
+let chatGeneration = 0;
 let chatId = 'demo-chat', stateListener = () => {}, backendListener = () => {}, inputClick = () => {};
 const host = document.querySelector('#stage');
 const story = document.querySelector('#story');
@@ -47,17 +49,21 @@ function drawStory(){story.replaceChildren(...messages.map(m=>{
   article.append(title,prose,action); for(const [wrapper,id] of injections) if(id===m.id) article.append(wrapper); return article;
 }));}
 drawStory();
-function view(){for(const e of state.story.timeline){const m=messages.find(m=>m.id===e.messageId);e.stale=!m||sourceHash(m)!==e.sourceHash}return {chatName:customTitle || (chatId === 'other-chat' ? 'The last train / sample chat' : 'Blackwater / sample chat'),messages,totalMessages:messages.length,connections:[{id:'demo',name:'Sample connection',model:'Preview only'}],state};}
+function view(){for(const e of state.story.timeline){const m=messages.find(m=>m.id===e.messageId);e.stale=!m||sourceHash(m)!==e.sourceHash}return {chatName:customTitle || (chatId === 'other-chat' ? 'The last train / sample chat' : 'Blackwater / sample chat'),messages,totalMessages:messages.length,connections:[{id:'demo',name:'Sample connection',model:'Preview only'}],state:{...state,conversations:state.conversations.map(({turns,...info})=>({...info,turnCount:turns.length}))}};}
 function reply(req,result){queueMicrotask(() => backendListener({...req,ok:true,result}));}
 const ctx = {
   deferReady(){},ready(){},
   state:{get(){return {chatId}},subscribe(key,fn){stateListener=fn;return ()=>{}}},
   events:{on(name,fn){const set=events.get(name)||new Set();set.add(fn);events.set(name,set);return ()=>set.delete(fn)}},
   onBackendMessage(fn){backendListener=fn;return ()=>{}},
-  sendToBackend(req){
+  async sendToBackend(req){
+    if(req.action==='cancel')chatGeneration++;
     if(['cancelCommentary','cancel','heartbeat'].includes(req.action)) return reply(req,null);
     if(req.action === 'commentary'){const key=JSON.stringify(req.data);if(!state.settings.commentaryEnabled||commentarySeen.has(key))return reply(req,null);commentarySeen.add(key);state.commentaryCount++;if(state.commentaryCount<state.settings.commentaryInterval)return reply(req,null);state.commentaryCount=0;return reply(req,"Sure. Knock back. What's the worst that could fucking happen?")}
-    if(req.action === 'resetChat')state.turns=[];
+    if(req.action === 'resetChat'){state.turns=[];state.conversation.title='New conversation'}
+    if(req.action === 'newConversation'){if(state.turns.length)state.conversations.push({...state.conversation,turns:structuredClone(state.turns)});state.turns=[];state.conversation={id:String(Date.now()),title:'New conversation',createdAt:Date.now(),updatedAt:Date.now()}}
+    if(req.action === 'switchConversation'){const saved=state.conversations.find(c=>c.id===req.data.id);state.conversations=state.conversations.filter(c=>c.id!==req.data.id);if(state.turns.length)state.conversations.push({...state.conversation,turns:structuredClone(state.turns)});const {turns,...info}=saved;state.conversation=info;state.turns=turns}
+    if(req.action === 'deleteConversation')state.conversations=state.conversations.filter(c=>c.id!==req.data.id);
     if(req.action === 'message') return reply(req,messages.find(m=>m.id===req.data.messageId));
     if(req.action === 'swipes'){const m=messages.find(m=>m.id===req.data.messageId);return reply(req,{messageId:m.id,active:m.swipe_id,swipes:m.swipes,dates:m.swipe_dates,revision:JSON.stringify(m.swipes)})}
     if(req.action === 'mergeSwipes'){const m=messages.find(m=>m.id===req.data.messageId);state.story.merges.push({id:String(Date.now()),messageId:m.id,before:{swipes:[...m.swipes],dates:[...m.swipe_dates],active:m.swipe_id},createdAt:Date.now(),status:'applied'});m.swipes.push('Elias waited until the knocking stopped, then placed the key on the stair. "Your choice," he said.');m.swipe_dates.push(Date.now()/1000);m.swipe_id=m.swipes.length-1;m.content=m.swipes[m.swipe_id];drawStory()}
@@ -74,7 +80,13 @@ const ctx = {
     if(req.action === 'summaryContent') return reply(req,state.summaries[0].text);
     if(req.action === 'settings') state.settings = req.data.settings;
     if(req.action === 'react') {const page=state.pages.find(p=>p.id===req.data.pageId);if(req.data.kind==='vote'){page.votes=page.votes.includes(req.data.postId)?page.votes.filter(id=>id!==req.data.postId):[...page.votes,req.data.postId]}else page.comments.push({id:String(Date.now()),postId:req.data.postId,author:'You',body:req.data.text});}
-    if(req.action === 'ask') state.turns.push({role:'user',content:req.data.text},{role:'assistant',content:'Preview mode, boss. The real me uses your chosen connection. These demo messages stay in this page.'});
+    if(req.action === 'ask') {
+      const generation=++chatGeneration;if(!state.turns.length)state.conversation.title=req.data.text.slice(0,56);state.turns.push({role:'user',content:req.data.text,at:Date.now()});
+      const answer='Preview mode, boss. The real me uses your chosen connection. These demo messages stay in this page.';
+      await new Promise(r=>setTimeout(r,1000));
+      for(let end=4;end<answer.length+4;end+=4){if(generation!==chatGeneration)return backendListener({...req,ok:false,error:'Preview reply stopped.'});backendListener({...req,stream:{conversationId:state.conversation.id,text:answer.slice(0,end)}});await new Promise(r=>setTimeout(r,45))}
+      state.turns.push({role:'assistant',content:answer,at:Date.now()});state.conversation.updatedAt=Date.now();
+    }
     if(req.action === 'edit') {const message=messages.find(m=>m.id===req.data.messageId),before=message.content, replacement='The light swept ashore. Elias gripped the key. "Not tonight." It found them anyway.';const r=req.data.range;const after=r?before.slice(0,r.start)+'the edited selection'+before.slice(r.end):replacement;state.undo.push({id:String(Date.now()),messageId:message.id,label:'Preview edit',before,after,swipe:0,createdAt:Date.now(),status:'applied'});message.content=after;drawStory();}
     if(req.action === 'undo'){const u=state.undo.find(u=>u.id===req.data.undoId);messages.find(m=>m.id===u.messageId).content=u.before;u.status='undone';drawStory();}
     if(req.action==='summary') state.summaries.push({...state.summaries[0],id:String(Date.now())});

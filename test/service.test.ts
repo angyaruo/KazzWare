@@ -163,7 +163,7 @@ test('failed commentary events are consumed once and chat changes cancel pending
 });
 
 
-test('new Kazz chat clears only its persisted turns and starts the next request without them', async () => {
+test('clearing Kazz history clears only its persisted turns and starts the next request without them', async () => {
   const f = fake(); await f.ready();
   f.outputs.push('{"action":"answer","text":"OLD KAZZ DIALOGUE"}');
   await f.request('ask', { text: 'OLD USER REQUEST' });
@@ -173,7 +173,7 @@ test('new Kazz chat clears only its persisted turns and starts the next request 
   f.store.set('alice/chats/chat-b.json', other);
   const modelCalls = f.modelInputs.length;
   expect((await f.request('resetChat')).ok).toBe(true);
-  expect(f.state()).toEqual({ ...before, turns: [] });
+  expect(f.state()).toEqual({ ...before, turns: [], conversation: { ...before.conversation, title: 'New conversation', updatedAt: f.state().conversation.updatedAt } });
   expect(f.state('chat-b')).toEqual(other); expect(f.modelInputs).toHaveLength(modelCalls);
   expect(f.updates).toHaveLength(0); expect(f.books).toHaveLength(0);
   f.outputs.push('{"action":"answer","text":"Fresh answer"}'); await f.request('ask', { text: 'New question' });

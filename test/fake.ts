@@ -9,6 +9,7 @@ export function fake() {
   const messages = new Map<string, FakeMessage[]>([['chat-a', [{ id: 'm1', content: 'He watched the pale orbs. Then he waited.', name: 'Elias', is_user: false, swipe_id: 0, index_in_chat: 0 }]], ['chat-b', [{ id: 'm2', content: 'Different story.', name: 'Ari', is_user: false, swipe_id: 0, index_in_chat: 0 }]]]);
   let failSave = 0, saves = 0, finish = 'stop';
   let gate: (() => Promise<void>) | undefined;
+  let chunks: string[] | undefined, tokenGate: ((index: number) => Promise<void>) | undefined;
   const api = {
     sendToFrontend: (reply: Reply) => { replies.push(structuredClone(reply)); },
     chats: { get: async (id: string, user: string) => user === 'alice' ? structuredClone(chats.get(id)) : null, update: async (id: string, input: Record<string, unknown>) => { const c = { ...chats.get(id)!, ...input }; chats.set(id, c); return c; }, getMemories: async () => [] },
@@ -21,7 +22,7 @@ export function fake() {
       getJson: async (path: string, options: { fallback: State; userId: string }) => structuredClone(store.get(`${options.userId}/${path}`) || options.fallback),
       setJson: async (path: string, value: State, options: { userId: string }) => { saves++; if (saves === failSave) throw new Error('Storage failed'); store.set(`${options.userId}/${path}`, structuredClone(value)); },
     },
-    generate: { quietStream: async function* (input: unknown) { modelInputs.push(input); if (gate) await gate(); const content = outputs.shift() || ''; yield { type: 'done', content, finish_reason: finish }; } },
+    generate: { quietStream: async function* (input: unknown) { modelInputs.push(input); if (gate) await gate(); const content = outputs.shift() || ''; if (chunks) { for (const [i, token] of chunks.entries()) { yield { type: 'token', token }; if (tokenGate) await tokenGate(i); } } yield { type: 'done', content, finish_reason: finish }; } },
   };
   const service = new KazzService(api as unknown as SpindleAPI);
   let binding = 'binding-a', chatId: string | null = 'chat-a', sequence = 0;
@@ -35,6 +36,7 @@ export function fake() {
   function editData() { const m = messages.get('chat-a')![0]; return { messageId: m.id, expected: m.content, swipe: m.swipe_id, direction: 'Use simpler wording' }; }
   return { service, api, store, replies, updates, modelInputs, outputs, books, chats, messages, request, ready, state, editData,
     switchChat(id: string | null) { chatId = id; binding = `binding-${++sequence}`; return request('bind'); },
+    stream(tokens: string[], afterToken?: (index: number) => Promise<void>) { chunks = tokens; tokenGate = afterToken; },
     setGate(fn: (() => Promise<void>) | undefined) { gate = fn; }, failNextSave(offset = 1) { failSave = saves + offset; }, setFinish(value: string) { finish = value; } };
 }
 export function deferred() { let resolve!: () => void; const promise = new Promise<void>(r => { resolve = r; }); return { promise, resolve }; }
