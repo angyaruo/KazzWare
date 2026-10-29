@@ -1,3 +1,4 @@
+import { migrateConversations } from './conversations';
 import type { SpindleAPI, InterceptorContextDTO, LlmMessageDTO, InterceptorResultDTO } from 'lumiverse-spindle-types';
 import { DEFAULTS, emptyState, integer, object, parseJSON, string, type Message, type State } from './shared';
 import { emptyStory, fingerprint, type SwipeSet, type StoryView, type TimelineEntry, type Spoiler } from './story-types';
@@ -8,6 +9,7 @@ export type StoryJob = {
   model(instruction: string, data: unknown, tokens?: number): Promise<string>;
 };
 export function migrate(state: State) {
+  migrateConversations(state);
   state.settings = { ...DEFAULTS, ...state.settings };
   state.commented ??= []; state.commentaryCount ??= 0; state.story = { ...emptyStory(), ...state.story };
   return state;

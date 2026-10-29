@@ -161,3 +161,35 @@ test('failed commentary events are consumed once and chat changes cancel pending
   const pending = f.request('commentary', { ...data, swipe: 1, expected: message.content }); await until(() => f.modelInputs.length === 2);
   await f.switchChat('chat-b'); gate.resolve(); expect((await pending).ok).toBe(false); expect(f.updates).toHaveLength(0);
 });
+
+
+test('clearing Kazz history clears only its persisted turns and starts the next request without them', async () => {
+  const f = fake(); await f.ready();
+  f.outputs.push('{"action":"answer","text":"OLD KAZZ DIALOGUE"}');
+  await f.request('ask', { text: 'OLD USER REQUEST' });
+  f.state().summaries.push({ id: 'note', text: 'Continuity note', throughMessage: 'm1', messages: 1, createdAt: 1 });
+  f.state().undo.push({ id: 'undo', label: 'Edit', messageId: 'm1', before: 'Before', after: 'After', swipe: 0, createdAt: 1, status: 'applied' });
+  const before = structuredClone(f.state()); const other = { ...structuredClone(before), turns: [{ role: 'user' as const, content: 'Other chat turn', at: 1 }] };
+  f.store.set('alice/chats/chat-b.json', other);
+  const modelCalls = f.modelInputs.length;
+  expect((await f.request('resetChat')).ok).toBe(true);
+  expect(f.state()).toEqual({ ...before, turns: [], conversation: { ...before.conversation, title: 'New conversation', updatedAt: f.state().conversation.updatedAt } });
+  expect(f.state('chat-b')).toEqual(other); expect(f.modelInputs).toHaveLength(modelCalls);
+  expect(f.updates).toHaveLength(0); expect(f.books).toHaveLength(0);
+  f.outputs.push('{"action":"answer","text":"Fresh answer"}'); await f.request('ask', { text: 'New question' });
+  const input = JSON.stringify(f.modelInputs.at(-1));
+  expect(input).not.toContain('OLD KAZZ DIALOGUE'); expect(input).not.toContain('OLD USER REQUEST');
+  expect(input).toContain('Continuity note'); expect(input).toContain('orbs');
+  expect((await f.request('load')).result).toMatchObject({ state: { turns: [{ content: 'New question' }, { content: 'Fresh answer' }] } });
+});
+
+test('failed conversation reset leaves saved turns intact; queued reset retires a pending reply', async () => {
+  const f = fake(); await f.ready(); f.state().turns.push({ role: 'user', content: 'Saved request', at: 1 });
+  f.failNextSave(); expect((await f.request('resetChat')).ok).toBe(false);
+  expect(f.state().turns).toEqual([{ role: 'user', content: 'Saved request', at: 1 }]);
+  const gate = deferred(); f.setGate(() => gate.promise); f.outputs.push('{"action":"answer","text":"Late answer"}');
+  const ask = f.request('ask', { text: 'Waiting question' }); await until(() => f.modelInputs.length === 1);
+  const reset = f.request('resetChat'); gate.resolve();
+  expect((await ask).ok).toBe(true); expect((await reset).ok).toBe(true);
+  expect((await f.request('load')).result).toMatchObject({ state: { turns: [] } });
+});

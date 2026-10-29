@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.3 — Saved Kazz chats and streaming
+
+- Rework Chat around Kazz leaning directly on Your direct line. Use a small + for a fresh chat and an ellipsis with Manage chats and Clear history. New chats archive the previous conversation; reopening restores it. Clearing the current conversation and deleting a saved one require separate confirmations.
+- Migrate existing Kazz history in place. Keep up to 50 saved conversations per roleplay, with no automatic archive deletion. Keep each conversation's existing 100-turn retention (latest 50 displayed); only active dialogue enters model context. Routine views send archive metadata without message bodies. Stale conversation IDs cannot submit into another conversation.
+- Stream reader-facing answer text through the existing authenticated channel. Show animated typing dots in Chat and beside the widget when the menu is closed. Keep tool actions private, escape displayed text, and discard incomplete/failed reply previews. Completed tool changes and their Undo records remain.
+- Add a per-roleplay output-token cutoff in Settings (256–32,768; default 8,192), used for Chat and as an upper bound on task-specific generation budgets. Provider limits still apply.
+- Add Reset widget position in Settings, preserving mobile peeking and saved chat data. The reported missing desktop widget was resolved by updating the affected installation.
+- Rebuild bundles and deterministic preview, expand persistence/streaming/UI regressions, and update docs. No new permissions or dependencies.
+
 ## 0.7.2 — Kazz voice and noncanonical commentary
 
 - Add the owner's full personality paragraph to the shared system prompt: obsessive archivist, shameless shipper, vulgar supporter, internet-rot dialogue and kaomoji. Replace the older voice description that prohibited insulting the user.

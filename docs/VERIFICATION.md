@@ -1,15 +1,19 @@
-# Alpha 0.7.2 verification · 2026-10-28
+# KazzWare 0.7.3 verification · 2026-10-29
 
 ## Confirmed locally
 
-- Windows x64; Bun 1.4.4, Node 22.15.1, TypeScript 5.9.3, Spindle SDK 0.6.49. No new dependencies or permissions in this release.
-- `npm run check`: type checking, **73 tests / 389 assertions across eight files**, and both tracked ESM bundles passed. Backend: 58,473 bytes; frontend: 15,367,896 bytes, including original owner artwork and local font.
-- The backend's shared personality and widget-reaction instructions changed. The exact backend scanner from Lumiverse main `3d74148383dded2b379f204532cf375b52bcd201` accepts the rebuilt bundle without capability exemptions; its prohibited-call negative control passed.
+- Windows x64; Bun 1.4.4, Node 22.15.1, TypeScript 5.9.3, Spindle SDK 0.6.49. No new dependencies or permissions; legacy conversation metadata is migrated in place.
+- `npm run check`: type checking, **87 tests / 681 assertions across nine files**, and both tracked ESM bundles passed. Backend: 63,472 bytes; frontend: 15,383,765 bytes, including original owner artwork and local font.
+- The exact backend scanner from Lumiverse main `3d74148383dded2b379f204532cf375b52bcd201` accepts the rebuilt bundle without capability exemptions; its prohibited-call negative control passed.
 - `git diff --check` passed. Preview rebuilt from the shipped frontend. Runtime/source ZIPs are packaged from tracked release files after commit.
 
-This is a prompt update. An additional local smoke check captured real assistant and edit request envelopes using the deterministic host fake: both contained the owner's personality paragraph verbatim, the source-voice boundary, and no obsolete prohibition on insulting the user. No provider calls were made. Automated checks cannot establish whether a particular provider consistently performs the intended voice or respects the noncanonical boundary.
+Regression checks cover saving/reopening independent Kazz conversations, legacy history migration, metadata-only archive replies, current-roleplay boundaries, stale-conversation rejection, capacity without silent deletion, failed saves, and archiving behind a queued reply. Stream tests exercise split JSON escapes and emoji at every boundary, private tool actions, delivery before completion, cutoff enforcement, cancellation, failed final persistence, HTML-as-text rendering, final reply deduplication, and hiding typing indicators. UI checks cover +, ellipsis management, protected clear/cancel, settings persistence and existing desktop/mobile widget position reset.
+The reported missing desktop widget was resolved on the affected installation after updating. This patch adds a position-reset convenience; it does not claim to reproduce or fix another startup problem. Host-hidden widgets remain controlled by Lumiverse's Extensions UI.
 
-Frontend tests exercise the real frontend/service with deterministic host/model fakes. All earlier swipe merge/Undo, title conflict protection, Summary+/future-beat injection, highlight timing, exact-range Undo, drag/position, chat switching, Gallery, assistant, notebook and isolation tests still pass.
+## Current preview checks
+
+The shipped frontend was exercised in the deterministic local preview at 1280×720, 390×844 and 320×700. Kazz leans directly on the input box beside the + and ellipsis controls. A fresh chat preserved the original sample conversation, Manage chats reopened it, and Clear history exposed an explicit confirmation with Cancel. The normal Chat body fits without an outer scroll or horizontal overflow; the transcript scrolls independently. A sample reply showed animated typing before incremental text, then one completed reply. The native story remained present. Preview streaming is simulated; no provider calls or production chat writes were made. Existing widget position reset remains covered by the full suite.
+Earlier functionality remains covered by the full suite. Historical rendered evidence below describes the unchanged core visual layout, not an additional live installation check for this patch.
 
 ## Retained 0.7.1 rendered preview evidence
 
@@ -21,7 +25,7 @@ The preview is sample-only and deterministic: no AI requests, Lumiverse API call
 
 ## Live smoke test after update
 
-1. Merge/update to 0.7.2, restart KazzWare and refresh Lumiverse. Confirm the version and existing saved data. No additional permissions should appear when upgrading from 0.7.1. Select Kazz's connection if needed. Ask Kazz to react and enable widget commentary: inspect the new voice and confirm shipping/speculation stays opinion. Edit a message and create a factual summary: Kazz's own slang and reactions must not leak into either output.
+1. Merge/update to 0.7.3, restart KazzWare and refresh Lumiverse. Confirm legacy conversation history. In Chat, use +, reopen the previous conversation through … → Manage chats, then cancel and confirm clearing the current history. Verify other saved conversations and roleplay notes/settings/Undo remain, and persistence survives reload. Try another roleplay and confirm its conversations are separate. Set a realistic token cutoff, stream a reply with the selected provider, and close the menu while thinking to check the widget bubble. Stop or switch roleplays mid-stream; no partial assistant reply should be saved. A provider that only sends a final chunk will display the answer at completion. Use Settings → Reset widget position on desktop/mobile; use Lumiverse's Extensions UI for host-hidden widgets.
 2. Check all nine Home buttons, red hover/press feedback, keyboard focus, text contrast over different chat backgrounds and reduced-motion settings. On a physical phone, drag the peeker to either edge, open/close tools, rotate the screen and open the keyboard. Toggle back to the round launcher in Settings and verify menu anchoring.
 3. Open Commentary from Home. Try interval 2, each bubble size, a short timed bubble and Until closed. Verify skipped/duplicate events do not replace the current bubble, unseen swipes advance the interval once, and disabling/chat switching clears the bubble. Try Chat names from Home: first-message naming, 10-message updates, manual naming and Undo; swipes/edits must not advance its count.
 4. Open Swipes from Home, pick a native message and choose two or more replies. Try blank and explicit directions. Verify a new active swipe, preserved originals and Undo; confirm a newer manual edit blocks an old merge Undo.
@@ -36,4 +40,4 @@ The preview is sample-only and deterministic: no AI requests, Lumiverse API call
 - Summary+ stores 500 current and 500 alternate-source notes. Only the latest 80 matching notes, bounded to 18,000 serialized characters, enter the prompt. Future intent adds at most one 2,000-character event. Context size increases accordingly; this does not replace full history. Dates are in-story fields, not system timestamps.
 - Spoiler delays are earliest opportunities, not deadlines. Fulfillment is marked manually. The roleplay model still decides if a ready beat fits the next user turn. Context outside Kazz's configured working window may be missed during assessment.
 - Host writes lack atomic compare-and-swap; a narrow concurrent-write window remains after final reads. Undo protects ordinary later edits but is not a transaction against all concurrent external writers.
-- Existing limits remain: 30 Gallery pages, 20 message-edit Undo records, ten Notebook summaries and 100 Kazz turns (latest 50 shown). Merge/title journals retain ten each. Jobs time out after ten minutes. Native selection supports uniquely mapped prose, not arbitrary rendered markup or separate message iframes.
+- Existing limits remain: 30 Gallery pages, 20 message-edit Undo records, ten Notebook summaries and 100 turns per Kazz conversation (latest 50 shown as bounded excerpts), up to 50 saved conversations plus the active one. Merge/title journals retain ten each. Jobs time out after ten minutes. Native selection supports uniquely mapped prose, not arbitrary rendered markup or separate message iframes.

@@ -440,3 +440,98 @@ test('Summary+ automation follows completed replies, swipe navigation and native
   h.event({ chatId: 'chat-a', messageId: m.id, generationType: 'quiet' });
   await settleView(); expect(h.f.modelInputs).toHaveLength(4);
 });
+
+
+test('plus saves a chat, Manage reopens it, and clearing requires a separate confirmation', async () => {
+  const h = await harness(); h.f.state().turns.push({ role: 'assistant', content: 'Old reply', at: 1 });
+  h.open(); h.click('[data-tab=settings]'); h.click('.reload-state');
+  await until(() => h.root.querySelector('.status')!.textContent!.includes('Reloaded.')); h.click('[data-tab=chat]');
+  const draft = h.root.querySelector<HTMLTextAreaElement>('.ask')!;
+  draft.value = 'Unsent draft'; draft.dispatchEvent(new h.dom.window.Event('input'));
+  h.click('.new-kazz-chat');
+  await until(() => !!h.root.querySelector('.chat-empty'));
+  expect(h.f.state().conversations[0].turns[0].content).toBe('Old reply');
+  expect(h.root.querySelector<HTMLTextAreaElement>('.ask')!.value).toBe('');
+  h.click('.chat-more'); expect(h.root.querySelector<HTMLElement>('.chat-popover')!.hidden).toBe(false);
+  h.click('.manage-chats'); expect(h.root.querySelector<HTMLElement>('.chat-manager')!.hidden).toBe(false);
+  h.click('.open-conversation'); await until(() => h.root.querySelector('.transcript')!.textContent!.includes('Old reply'));
+  h.click('.chat-more'); h.click('.clear-chat');
+  expect(h.root.querySelector<HTMLElement>('.reset-chat-confirm')!.hidden).toBe(false);
+  expect(h.root.activeElement?.className).toBe('cancel-reset-chat');
+  h.click('.cancel-reset-chat'); expect(h.requests.some(r => r.action === 'resetChat')).toBe(false);
+  expect(h.f.state().turns[0].content).toBe('Old reply');
+  h.click('.chat-more'); h.click('.clear-chat'); h.click('.confirm-reset-chat');
+  await until(() => !!h.root.querySelector('.chat-empty'));
+  expect(h.f.state().turns).toHaveLength(0); expect(h.f.updates).toHaveLength(0);
+  h.click('.chat-more'); h.click('.clear-chat'); h.switch('chat-b');
+  await until(() => h.root.querySelector('.chat-name')!.textContent === 'Other chat');
+  expect(h.root.querySelector<HTMLElement>('.reset-chat-confirm')!.hidden).toBe(true);
+});
+
+test('Chat shows typing, streams plain text before completion, and ignores late replies after a roleplay switch', async () => {
+  const h = await harness(); h.open(); h.click('[data-tab=chat]');
+  const thinking = deferred(), tokens = deferred(); h.f.setGate(() => thinking.promise);
+  const answer = JSON.stringify({ action: 'answer', text: 'Hello <script>bad()</script> Operator' });
+  h.f.outputs.push(answer); h.f.stream(['{"action":"answer","text":"Hello <script>bad()</script>', ' Operator"}'], i => i === 0 ? tokens.promise : Promise.resolve());
+  const input = h.root.querySelector<HTMLTextAreaElement>('.ask')!; input.value = 'Hi Kazz'; input.dispatchEvent(new h.dom.window.Event('input')); h.click('.send');
+  await until(() => h.f.modelInputs.length === 1);
+  expect(h.root.querySelector<HTMLElement>('.chat-pending')!.hidden).toBe(false);
+  expect(h.root.querySelector<HTMLElement>('.typing')!.hidden).toBe(false);
+  expect(h.root.querySelector<HTMLButtonElement>('.new-kazz-chat')!.disabled).toBe(true);
+  thinking.resolve(); await until(() => h.root.querySelector('.stream-text')!.textContent!.includes('<script>'));
+  expect(h.root.querySelector('.stream-text script')).toBeNull();
+  expect(h.root.querySelector<HTMLElement>('.typing')!.hidden).toBe(true);
+  expect(h.f.state().turns).toHaveLength(1);
+  h.click('.close');
+  const typingPortal = h.dom.window.document.querySelector<HTMLElement>('[data-kazzware-owned=typing]')!;
+  expect(typingPortal.hidden).toBe(false); expect(typingPortal.shadowRoot!.textContent).toContain('Kazz is typing');
+  h.switch('chat-b'); tokens.resolve();
+  expect(typingPortal.hidden).toBe(true);
+  await until(() => h.root.querySelector('.chat-name')!.textContent === 'Other chat');
+  await settleView(); expect(h.root.querySelector('.transcript')!.textContent).not.toContain('Hello');
+  expect(h.f.state('chat-a').turns.filter(t => t.role === 'assistant')).toHaveLength(0);
+});
+
+test('cut-off streaming reply is removed; cutoff setting is saved and sent to the chosen connection', async () => {
+  const h = await harness(); h.open(); h.click('[data-tab=settings]');
+  const cutoff = h.root.querySelector<HTMLInputElement>('.max-output-tokens')!; cutoff.value = '512'; cutoff.dispatchEvent(new h.dom.window.Event('input'));
+  h.click('.save-settings'); await until(() => h.f.state().settings.maxOutputTokens === 512);
+  await settleView(); h.click('[data-tab=chat]'); const gate = deferred();
+  h.f.outputs.push('{"action":"answer","text":"Partial reply"}'); h.f.setFinish('length');
+  h.f.stream(['{"action":"answer","text":"Partial'], () => gate.promise);
+  const ask = h.root.querySelector<HTMLTextAreaElement>('.ask')!; ask.value = 'Hi'; ask.dispatchEvent(new h.dom.window.Event('input')); h.click('.send');
+  await until(() => h.root.querySelector('.stream-text')!.textContent === 'Partial');
+  gate.resolve(); await until(() => h.root.querySelector('.status')!.textContent!.includes('cut short'));
+  await until(() => h.root.querySelector<HTMLElement>('.chat-pending')!.hidden);
+  expect(h.root.querySelector('.transcript')!.textContent).not.toContain('Partial');
+  expect(h.f.modelInputs.at(-1)).toMatchObject({ parameters: { max_tokens: 512 } });
+});
+
+test('Reset widget position restores an off-screen mascot and keeps mobile peeking and chat data', async () => {
+  const h = await harness(), pet = h.widgets[0];
+  const button = pet.root.shadowRoot!.querySelector<HTMLButtonElement>('button')!;
+  button.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+  pet.x = 5000; pet.y = 5000;
+  h.open(); h.click('.quick-settings'); h.click('.recover-widget');
+  expect(pet.visible).toBe(true); expect(h.widgets[1].visible).toBe(false);
+  expect(pet.x).toBeLessThan(h.dom.window.innerWidth); expect(pet.y).toBeLessThan(h.dom.window.innerHeight);
+  expect(h.widgets).toHaveLength(2); expect(h.f.state().settings.connectionId).toBe('connection'); expect(h.f.updates).toHaveLength(0);
+  Object.defineProperty(h.dom.window, 'innerWidth', { value: 390, configurable: true }); h.dom.window.dispatchEvent(new h.dom.window.Event('resize'));
+  h.open(); h.click('.recover-widget'); expect(pet.width).toBe(64); expect(pet.height).toBe(84); expect(pet.x).toBe(318);
+  expect(button.classList.contains('peek')).toBe(true);
+});
+
+
+test('completed stream becomes one saved reply and removes both typing indicators', async () => {
+  const h = await harness(); h.open(); h.click('[data-tab=chat]'); const gate = deferred();
+  const answer = '{"action":"answer","text":"Complete reply"}'; h.f.outputs.push(answer);
+  h.f.stream(['{"action":"answer","text":"Complete', ' reply"}'], i => i === 0 ? gate.promise : Promise.resolve());
+  const ask = h.root.querySelector<HTMLTextAreaElement>('.ask')!; ask.value = 'Hi'; ask.dispatchEvent(new h.dom.window.Event('input')); h.click('.send');
+  await until(() => h.root.querySelector('.stream-text')!.textContent === 'Complete');
+  gate.resolve(); await until(() => h.root.querySelector('.status')!.textContent!.includes('Kazz has replied'));
+  expect(h.root.querySelector<HTMLElement>('.chat-pending')!.hidden).toBe(true);
+  expect(h.root.querySelectorAll('.transcript>.assistant')).toHaveLength(1);
+  expect(h.root.querySelector('.transcript>.assistant')!.textContent).toBe('KAZZComplete reply');
+  expect(h.dom.window.document.querySelector<HTMLElement>('[data-kazzware-owned=typing]')!.hidden).toBe(true);
+  expect(h.root.querySelector<HTMLButtonElement>('.new-kazz-chat')!.disabled).toBe(false);
+});

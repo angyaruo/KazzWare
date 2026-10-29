@@ -1,3 +1,5 @@
+import { typingBubble } from './typing-bubble';
+import { mountChat, paintChatStream, CHAT_CSS, type ChatStream } from './chat-ui';
 import type { SpindleFrontendContext, SpindleSandboxFrameHandle } from 'lumiverse-spindle-types';
 import cover from '../assets/kazz-cover.png';
 import { mascotLayout } from './mascot-layout';
@@ -45,10 +47,11 @@ export function setup(ctx: SpindleFrontendContext): () => void {
   let target: Message | undefined; let range: Range | undefined; let selectionRequest = 0;
   let following = true; let picking = false; let followTimer: ReturnType<typeof setTimeout> | undefined; let autoPending = ''; let autoToken = 0;
   let marked: Element | null = null; let hovered: Element | null = null;
+  let chatStream: ChatStream | undefined;
   let direction = ''; let askDraft = ''; let slopDraft: string | undefined; let settingsDraft: Settings | undefined;
   let timelineShown = 30; let commentaryDraft: Partial<Settings> = {}, namingDraft: Partial<Settings> = {};
   let pageId = ''; let frame: SpindleSandboxFrameHandle | undefined; let status = 'Open a chat to wake Kazz.'; let error = false; let busy = 0;
-  const pending = new Map<string, { resolve: (result: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
+  const pending = new Map<string, { resolve: (result: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout>; stream?: (stream: NonNullable<Reply['stream']>) => void }>();
   const mascot = positioned(ctx.ui.createFloatWidget({ width: 110, height: 110, initialPosition: { x: Math.max(0, window.innerWidth - 125), y: Math.max(0, window.innerHeight - 245) }, snapToEdge: false, chromeless: true, touchScrollMode: 'native', tooltip: 'KazzWare · your in-chat accomplice' }), 110, 110);
   let panelWidth = Math.min(400, window.innerWidth - 16), panelHeight = Math.min(550, window.innerHeight - 24);
   const panel = positioned(ctx.ui.createFloatWidget({ width: panelWidth, height: panelHeight, initialPosition: { x: Math.max(8, window.innerWidth - 436), y: 12 }, snapToEdge: false, chromeless: true, touchScrollMode: 'native', tooltip: 'KazzWare' }), panelWidth, panelHeight);
@@ -61,7 +64,7 @@ export function setup(ctx: SpindleFrontendContext): () => void {
   petRoot.innerHTML = `<style>${CSS}</style><button class="mascot" aria-label="Open KazzWare"><img draggable="false" alt="Kazz, a silver-haired cyber-scorpion companion"><span class="dot"></span></button>`;
   const petButton = petRoot.querySelector('button')!; const petImage = petRoot.querySelector('img')!;
   const root = panel.root.attachShadow({ mode: 'open' });
-  root.innerHTML = `<style>${CSS}${STORY_CSS}</style><section class="shell" data-screen="home" aria-label="KazzWare"><header class="top"><div class="title" role="button" tabindex="0" aria-label="Move KazzWare menu; drag or use arrow keys" title="Drag to move · arrow keys also work"><div class="brand-line"><span class="hazard" aria-hidden="true">☣</span><span class="brand">KAZZWARE<em>.exe</em></span><span class="badge">FRIENDLY MALWARE</span></div><time class="system-clock"></time><div class="chat-name"></div></div><button class="quick-settings" aria-label="Connection settings">${icon('settings')}</button><button class="icon close" aria-label="Close KazzWare">×</button></header><nav aria-label="KazzWare sections"></nav><main class="body"></main><footer class="status" role="status" aria-live="polite"><span></span><button class="cancel-pick" hidden>Cancel pick</button><button class="cancel" hidden>Stop</button></footer></section>`;
+  root.innerHTML = `<style>${CSS}${STORY_CSS}${CHAT_CSS}</style><section class="shell" data-screen="home" aria-label="KazzWare"><header class="top"><div class="title" role="button" tabindex="0" aria-label="Move KazzWare menu; drag or use arrow keys" title="Drag to move · arrow keys also work"><div class="brand-line"><span class="hazard" aria-hidden="true">☣</span><span class="brand">KAZZWARE<em>.exe</em></span><span class="badge">FRIENDLY MALWARE</span></div><time class="system-clock"></time><div class="chat-name"></div></div><button class="quick-settings" aria-label="Connection settings">${icon('settings')}</button><button class="icon close" aria-label="Close KazzWare">×</button></header><nav aria-label="KazzWare sections"></nav><main class="body"></main><footer class="status" role="status" aria-live="polite"><span></span><button class="cancel-pick" hidden>Cancel pick</button><button class="cancel" hidden>Stop</button></footer></section>`;
   const clock = root.querySelector<HTMLTimeElement>('.system-clock')!;
   const tickClock = () => { const now = new Date(); clock.dateTime = now.toISOString(); clock.textContent = now.toLocaleString(undefined, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }); };
   tickClock(); const clockTimer = setInterval(() => { if (opened) tickClock(); }, 1000); disposers.push(() => clearInterval(clockTimer));
@@ -76,18 +79,19 @@ export function setup(ctx: SpindleFrontendContext): () => void {
   const notify = (text: string, failed = false) => { status = text; error = failed; paintStatus(); };
   function paintStatus() {
     statusBox.querySelector('span')!.textContent = status; statusBox.classList.toggle('error', error);
+    thinker.sync();
     petButton.classList.toggle('busy', busy > 0);
     mascot.setVisible(!!chatId && !opened);
     (statusBox.querySelector('.cancel-pick') as HTMLButtonElement).hidden = !picking;
     (statusBox.querySelector('.cancel') as HTMLButtonElement).hidden = busy === 0;
     body.querySelectorAll<HTMLButtonElement | HTMLSelectElement>('[data-mutate],.pick-message,.follow-target,.messages').forEach(control => { control.disabled = busy > 0 || (control.matches('.merge-now') && body.querySelectorAll('.merge-form input:checked').length < 2) || (control.matches('.assess-future') && !view?.state.settings.spoilersEnabled); });
   }
-  function rpc<T = unknown>(action: string, data: Record<string, unknown> = {}): Promise<T> {
+  function rpc<T = unknown>(action: string, data: Record<string, unknown> = {}, stream?: (stream: NonNullable<Reply['stream']>) => void): Promise<T> {
     if (destroyed) return Promise.reject(new Error('KazzWare closed.'));
     const id = randomId();
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => { pending.delete(id); reject(new Error('Kazz did not receive a response. Reload to check completed changes.')); }, 610_000);
-      pending.set(id, { resolve: result => resolve(result as T), reject, timer });
+      pending.set(id, { resolve: result => resolve(result as T), reject, timer, stream });
       ctx.sendToBackend({ channel: CHANNEL, client, binding, chatId, id, action, data });
     });
   }
@@ -95,20 +99,23 @@ export function setup(ctx: SpindleFrontendContext): () => void {
     let reply: Reply; try { reply = object(payload) as unknown as Reply; } catch { return; }
     if (reply.channel !== CHANNEL || reply.client !== client || reply.binding !== binding || destroyed) return;
     const request = pending.get(reply.id); if (!request) return;
+    if (reply.stream) { request.stream?.(reply.stream); return; }
     if (reply.progress) { notify(reply.progress); return; }
     clearTimeout(request.timer); pending.delete(reply.id);
     reply.ok ? request.resolve(reply.result) : request.reject(new Error(reply.error || 'KazzWare request failed.'));
   }));
-  async function run(action: string, data: Record<string, unknown> = {}, success = 'Done. Your changes are saved.') {
+  async function run(action: string, data: Record<string, unknown> = {}, success = 'Done. Your changes are saved.', stream?: (stream: NonNullable<Reply['stream']>) => void) {
     if (action === 'settings' && !(data.settings as Settings)?.commentaryEnabled) chatter.pause();
     const origin = binding; busy++; paintStatus(); notify('Working…');
     try {
-      const result = await rpc<View | null>(action, data);
+      const result = await rpc<View | null>(action, data, stream);
       if (origin !== binding || destroyed) return false;
+      if (action === 'ask') { chatStream = undefined; thinker.sync(); }
       if (result) { view = result; await refreshTarget(); if (origin !== binding) return false; render(); }
       notify(success); return true;
     } catch (err) {
       if (origin === binding && !destroyed) {
+        if (action === 'ask') { chatStream = undefined; thinker.sync(); }
         notify(err instanceof Error ? err.message : 'Something went wrong.', true);
         try { const refreshed = await rpc<View>('load'); if (origin === binding) { view = refreshed; await refreshTarget(); if (origin === binding) render(); } } catch { /* Preserve the original error. */ }
       }
@@ -141,6 +148,12 @@ export function setup(ctx: SpindleFrontendContext): () => void {
   root.addEventListener('keydown', ev => { if ((ev as KeyboardEvent).key === 'Escape') hide(); });
   const inputAction = ctx.ui.registerInputBarAction({ id: 'kazzware-open', label: 'KazzWare', subtitle: 'Your in-chat accomplice', iconUrl: cover });
   disposers.push(inputAction.onClick(() => show())); disposers.push(() => inputAction.destroy());
+  function resetWidgetPosition() {
+    petDrag.cancel(); panelDrag.cancel(); for (const drag of artDrags) drag.cancel();
+    launcher.reset();
+    panel.moveTo(Math.max(8, window.innerWidth - panelWidth - 24), 24);
+    hide(); notify('Kazz is back beside the chat.');
+  }
   if (ctx.registerMessageAction) {
     const action = ctx.registerMessageAction({ id: 'kazzware-edit', label: 'Send to Kazz', onClick: id => { void selectMessage(id); } });
     disposers.push(() => action.destroy());
@@ -246,8 +259,10 @@ export function setup(ctx: SpindleFrontendContext): () => void {
   });
   function syncGallery() { inline.sync(view?.state.pages || [], !!view?.state.settings.galleryEnabled && !!chatId); }
   disposers.push(() => inline.clear());
-  const chatter = commentary(ctx, mascot.root, { settings: () => view?.state.settings, enabled: () => !!view?.state.settings.commentaryEnabled && !!chatId, chatId: () => chatId, visible: () => !!chatId && !opened, rpc, error: text => notify(text, true) });
+  const chatter = commentary(ctx, mascot.root, { settings: () => view?.state.settings, enabled: () => !!view?.state.settings.commentaryEnabled && !!chatId, chatId: () => chatId, visible: () => !!chatId && !opened && !chatStream, rpc, error: text => notify(text, true) });
   disposers.push(() => chatter.destroy());
+  const thinker = typingBubble(ctx, mascot.root, { active: () => !!chatStream, visible: () => !!chatId && !opened, width: () => view?.state.settings.commentaryWidth });
+  disposers.push(() => thinker.destroy());
   const prompt = selectionPrompt(ctx.dom, {
     available: () => !!chatId && !!view && !busy && !destroyed && !picking,
     load: id => rpc<Message>('message', { messageId: id }), pin: pinTarget,
@@ -280,7 +295,7 @@ export function setup(ctx: SpindleFrontendContext): () => void {
     prompt.reset(); chatter.reset(); inline.clear(); petDrag.cancel(); panelDrag.cancel();
     for (const item of pending.values()) { clearTimeout(item.timer); item.reject(new Error('Chat changed.')); } pending.clear();
     stopPicking(); following = true; invalidateSelection(); clearTimeout(followTimer);
-    binding = randomId(); chatId = next; view = undefined; target = undefined; range = undefined; direction = ''; askDraft = ''; slopDraft = undefined; settingsDraft = undefined; pageId = ''; timelineShown = 30; commentaryDraft = {}; namingDraft = {}; busy = 0;
+    binding = randomId(); chatId = next; view = undefined; target = undefined; range = undefined; direction = ''; askDraft = ''; chatStream = undefined; slopDraft = undefined; settingsDraft = undefined; pageId = ''; timelineShown = 30; commentaryDraft = {}; namingDraft = {}; busy = 0;
     frame?.destroy(); frame = undefined; mascot.setVisible(!!chatId); panel.setVisible(!!chatId && opened); inputAction.setEnabled(!!chatId);
     render();
     if (chatId) void run('bind', {}, 'Kazz is here. Pick a message or ask a favor.'); else { void rpc('bind').catch(() => {}); notify('Open a chat to wake Kazz.'); }
@@ -303,6 +318,7 @@ export function setup(ctx: SpindleFrontendContext): () => void {
   function button(selector: string, handler: () => void) { body.querySelector(selector)?.addEventListener('click', handler); }
   function heading(code: string, title: string, tag: string) { return `<div class="section-head"><h2>${title}</h2></div>`; }
   function render() {
+    body.onclick = null; body.onkeydown = null;
     resize();
     for (const drag of artDrags) drag.destroy(); artDrags = [];
     syncGallery(); chatter.sync();
@@ -355,9 +371,24 @@ export function setup(ctx: SpindleFrontendContext): () => void {
     button('.scan', () => { const hits = target ? slopHits(target.content, phrases(), body.querySelector<HTMLInputElement>('.whole')!.checked) : []; body.querySelector('.hits')!.textContent = !target ? 'Select a message in Editor first.' : hits.length ? hits.map(h => `${h.phrase} × ${h.count}`).join('\n') : 'Clean. No matches in the selected source.'; });
   }
   function renderChat() {
-    body.innerHTML = `<div class="chat-perch"><span class="chat-taunt">Yeah. I’m listening.</span><img draggable="false" src="${listening}" alt="Kazz leaning on the message input"></div><form class="chat-compose"><label for="kazz-ask">YOUR DIRECT LINE / KAZZ</label><textarea id="kazz-ask" class="ask" placeholder="Alright, Kazz…">${e(askDraft)}</textarea><button class="primary send" type="submit" data-mutate>Send to Kazz ↗</button></form><div class="transcript">${view!.state.turns.map(t => `<div class="bubble ${t.role}"><span class="speaker">${t.role === 'user' ? 'YOU' : 'KAZZ'}</span>${e(t.content)}</div>`).join('') || '<div class="chat-empty"><strong>What would you do without me?</strong><p>Find a line. Fix a message. Untangle the lore.<br>Give your resident parasite something to do.</p></div>'}</div><small class="chat-disclaimer">Private to this chat. Requested edits land immediately; Undo lives in Editor.</small>`;
-    body.querySelector('.ask')!.addEventListener('input', ev => { askDraft = (ev.target as HTMLTextAreaElement).value; });
-    body.querySelector('form')!.addEventListener('submit', ev => { ev.preventDefault(); const text = askDraft; if (busy || !text.trim()) return; askDraft = ''; void run('ask', { text }, 'Kazz has replied.'); });
+    const conversationId = view!.state.conversation.id;
+    mountChat(body, { state: view!.state, illustration: listening, draft: askDraft, stream: chatStream,
+      busy: () => busy > 0, draftChanged: text => { askDraft = text; },
+      async action(action, data = {}) {
+        const origin = binding;
+        const ok = await run(action, { ...data, conversationId }, action === 'newConversation' ? (view!.state.turns.length ? 'Fresh chat. Your previous conversation is saved.' : 'Fresh Kazz chat opened.') : action === 'switchConversation' ? 'Saved conversation opened.' : action === 'deleteConversation' ? 'Saved Kazz chat deleted.' : 'This Kazz conversation’s history is cleared.');
+        if (ok && origin === binding) { askDraft = ''; if (tab === 'chat') { render(); body.querySelector<HTMLTextAreaElement>('.ask')?.focus(); } }
+        return ok;
+      },
+      submit(text) {
+        askDraft = ''; chatStream = { conversationId, user: text, text: '' }; render();
+        void run('ask', { text, conversationId }, 'Kazz has replied.', stream => {
+          if (stream.conversationId !== conversationId || !chatStream || chatStream.conversationId !== conversationId || typeof stream.text !== 'string' || stream.text.length > 20_000) return;
+          chatStream.text = stream.text;
+          if (tab === 'chat') paintChatStream(body, chatStream);
+        });
+      },
+    });
   }
   function renderGallery() {
     const state = view!.state; const page = state.pages.find(p => p.id === pageId) || state.pages.at(-1); pageId = page?.id || '';
@@ -393,10 +424,11 @@ export function setup(ctx: SpindleFrontendContext): () => void {
   }
   function renderSettings() {
     const s = settingsDraft || view!.state.settings;
-    body.innerHTML = `${heading('06 / SETTINGS', 'Settings', 'HANDLE WITH CARE')}<p class="muted">Saved separately for each chat.</p><label class="field">Kazz’s connection<select class="connection"><option value="">Choose a connection…</option>${view!.connections.map(c => `<option value="${e(c.id)}" ${c.id === s.connectionId ? 'selected' : ''}>${e(c.name)} · ${e(c.model)}</option>`).join('')}</select></label><small>Uses this saved connection for every Kazz request. Your roleplay connection stays as it is.</small><label class="field">Recent messages in working context (5–100)<input class="context" type="number" min="5" max="100" value="${s.contextMessages}"></label><label class="field">Gallery interval (normal replies)<input class="interval" type="number" min="1" max="100" value="${s.interval}"></label><label class="field">Gallery format<select class="format">${[['random', 'Surprise me'], ['forum', 'AITA / discussion forum'], ['thread', 'Fandom social thread'], ['wiki', 'Unofficial wiki']].map(([key, label]) => `<option value="${key}" ${key === s.format ? 'selected' : ''}>${label}</option>`).join('')}</select></label><label class="field">Mascot size<input class="size" type="range" min="70" max="180" value="${s.mascotSize}"></label><label class="check"><span>Use the mobile peeker</span><input class="mobile-peek" type="checkbox" role="switch" ${s.mobilePeek ? 'checked' : ''}></label><div class="row"><button class="primary save-settings" data-mutate>Save settings</button><button class="reload-state">Reload</button></div><div class="note">Context goes to the connection you select. Search can inspect older messages; summaries read the whole chat. Kazz never receives connection API keys.</div>`;
-    const read = (): Settings => ({ ...view!.state.settings, mobilePeek: body.querySelector<HTMLInputElement>('.mobile-peek')!.checked, connectionId: body.querySelector<HTMLSelectElement>('.connection')!.value, contextMessages: Number(body.querySelector<HTMLInputElement>('.context')!.value), interval: Number(body.querySelector<HTMLInputElement>('.interval')!.value), format: body.querySelector<HTMLSelectElement>('.format')!.value as Settings['format'], mascotSize: Number(body.querySelector<HTMLInputElement>('.size')!.value) });
+    body.innerHTML = `${heading('06 / SETTINGS', 'Settings', 'HANDLE WITH CARE')}<p class="muted">Saved separately for each chat.</p><label class="field">Kazz’s connection<select class="connection"><option value="">Choose a connection…</option>${view!.connections.map(c => `<option value="${e(c.id)}" ${c.id === s.connectionId ? 'selected' : ''}>${e(c.name)} · ${e(c.model)}</option>`).join('')}</select></label><small>Uses this saved connection for every Kazz request. Your roleplay connection stays as it is.</small><label class="field">Kazz’s output cutoff (tokens)<input class="max-output-tokens" type="number" min="256" max="32768" step="1" value="${s.maxOutputTokens}"></label><small>256–32,768 tokens per response; your connection may allow less. Applies to Chat and caps other Kazz tasks. Cut-off or incomplete replies are not saved; completed tool changes remain.</small><label class="field">Recent messages in working context (5–100)<input class="context" type="number" min="5" max="100" value="${s.contextMessages}"></label><label class="field">Gallery interval (normal replies)<input class="interval" type="number" min="1" max="100" value="${s.interval}"></label><label class="field">Gallery format<select class="format">${[['random', 'Surprise me'], ['forum', 'AITA / discussion forum'], ['thread', 'Fandom social thread'], ['wiki', 'Unofficial wiki']].map(([key, label]) => `<option value="${key}" ${key === s.format ? 'selected' : ''}>${label}</option>`).join('')}</select></label><label class="field">Mascot size<input class="size" type="range" min="70" max="180" value="${s.mascotSize}"></label><label class="check"><span>Use the mobile peeker</span><input class="mobile-peek" type="checkbox" role="switch" ${s.mobilePeek ? 'checked' : ''}></label><div class="row"><button class="primary save-settings" data-mutate>Save settings</button><button class="reload-state">Reload</button><button class="recover-widget">Reset widget position</button></div><div class="note">Context goes to the connection you select. Search can inspect older messages; summaries read the whole chat. Kazz never receives connection API keys.</div>`;
+    const read = (): Settings => ({ ...view!.state.settings, maxOutputTokens: Number(body.querySelector<HTMLInputElement>('.max-output-tokens')!.value), mobilePeek: body.querySelector<HTMLInputElement>('.mobile-peek')!.checked, connectionId: body.querySelector<HTMLSelectElement>('.connection')!.value, contextMessages: Number(body.querySelector<HTMLInputElement>('.context')!.value), interval: Number(body.querySelector<HTMLInputElement>('.interval')!.value), format: body.querySelector<HTMLSelectElement>('.format')!.value as Settings['format'], mascotSize: Number(body.querySelector<HTMLInputElement>('.size')!.value) });
     body.querySelectorAll('input,select').forEach(input => input.addEventListener('input', () => { settingsDraft = read(); }));
     button('.save-settings', () => { const next = read(); settingsDraft = undefined; void run('settings', { settings: next }, 'Settings saved for this chat.'); });
+    button('.recover-widget', resetWidgetPosition);
     button('.reload-state', () => { settingsDraft = undefined; void run('load', {}, 'Reloaded.'); });
   }
   panel.setVisible(false); mascot.setVisible(false); resize(); changeChat(stateAPI.get('chat.active')); ctx.ready();
