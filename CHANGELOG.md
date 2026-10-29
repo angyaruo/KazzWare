@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.3 — Conversation reset and widget recovery
+
+- Add New chat with Kazz with an inline confirmation. Clear only Kazz's saved conversation for the current roleplay and the unsent draft after a successful reset; keep roleplay messages, preferences, notes and Undo. No model call is required.
+- Add Reset widget position in Kazz's Settings to return the launcher to a visible spot and close the menu. Preserve mobile peeking, normal drag/placement behavior and saved chat data. The reported missing desktop widget was resolved by updating the affected installation.
+- Extend conversation-reset and placement regression coverage and the sample preview. No permissions, dependencies or storage migration added.
+
 ## 0.7.2 — Kazz voice and noncanonical commentary
 
 - Add the owner's full personality paragraph to the shared system prompt: obsessive archivist, shameless shipper, vulgar supporter, internet-rot dialogue and kaomoji. Replace the older voice description that prohibited insulting the user.

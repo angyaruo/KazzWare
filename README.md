@@ -30,6 +30,8 @@ One swipe has the dialogue, another has the atmosphere, and neither quite gets i
 
 Talk to your accomplice in a separate conversation tied to the current chat. Ask him to search the full chat history, retrieve an older message, untangle continuity, edit a past reply, summarize the story, or build a lorebook from it. He can inspect character cards, personas, presets, lorebooks, databanks and current-chat memories when the task needs them.
 
+**New chat with Kazz** clears his saved conversation in the current roleplay after confirmation. Your roleplay, notes, settings and Undo records stay saved; Kazz still has the roleplay context for new requests.
+
 This is where his archivist-and-shipper personality gets to run its mouth. His reactions and theories are noncanonical opinions: they do not establish character motives, secret discoveries, the Operator's awareness, or future outcomes.
 
 <h3><img src="assets/readme/peanut-gallery.png" alt="Peanut Gallery" width="480"></h3>
@@ -79,6 +81,10 @@ You need **Lumiverse 1.2.5 or newer** and a working model connection saved in Lu
 4. Enable whichever automatic features you want from their Home buttons. Gallery, Commentary, Chat names, automatic timeline capture and prompt-injection controls all start off.
 
 The repository includes prebuilt extension files; installing KazzWare does not require building its source or adding runtime packages. Updating through the extension manager is followed by restarting KazzWare and refreshing Lumiverse. Manual server installation and development instructions are in the [developer guide](docs/DEVELOPMENT.md).
+
+### Missing widget?
+
+Make sure KazzWare is updated, restart it and refresh Lumiverse. Open a roleplay chat and use the **KazzWare** action by the chat input. **KazzWare → Settings → Reset widget position** brings the companion back to a visible spot and closes the menu. This keeps your saved chat data. If Lumiverse has hidden the widget, use its Extensions UI controls to show it. If no KazzWare controls appear at all, check that the extension is active and its UI Panels permission is granted.
 
 ## Your connection, your chat
 

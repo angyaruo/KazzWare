@@ -574,6 +574,11 @@ ${instruction}` }, { role: "user", content: JSON.stringify(data) }];
       case "bind":
       case "load":
         return this.view(job);
+      case "resetChat": {
+        job.state.turns = [];
+        await this.save(job);
+        return this.view(job);
+      }
       case "settings": {
         const next = settings(data.settings), previous = job.state.settings;
         if (next.commentaryInterval !== previous.commentaryInterval || next.commentaryEnabled !== previous.commentaryEnabled)

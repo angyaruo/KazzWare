@@ -25,7 +25,12 @@ export function mascotLayout(widget: SpindleFloatWidgetHandle, button: HTMLEleme
     if (resized && next) dock();
     else if (resized) { const p = widget.getPosition(); widget.moveTo(Math.max(8, Math.min(p.x, window.innerWidth - size - 8)), Math.max(8, Math.min(p.y, height() - size - 8))); }
   }
-  return { sync, width: () => peeking ? 64 : settings()?.mascotSize || 110, settled() {
+  return { sync, reset() {
+    side = 'right'; mobileY = Math.max(8, height() - 190);
+    const size = settings()?.mascotSize || 110;
+    roundPosition = { x: Math.max(8, window.innerWidth - size - 24), y: Math.max(8, height() - size - 130) };
+    widget.moveTo(roundPosition.x, roundPosition.y); sync(true);
+  }, width: () => peeking ? 64 : settings()?.mascotSize || 110, settled() {
     const p = widget.getPosition();
     if (peeking) { side = p.x + 32 < window.innerWidth / 2 ? 'left' : 'right'; mobileY = p.y; dock(); }
     else roundPosition = p;

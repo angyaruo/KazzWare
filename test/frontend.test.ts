@@ -440,3 +440,36 @@ test('Summary+ automation follows completed replies, swipe navigation and native
   h.event({ chatId: 'chat-a', messageId: m.id, generationType: 'quiet' });
   await settleView(); expect(h.f.modelInputs).toHaveLength(4);
 });
+
+
+test('New chat confirms, cancels, clears the saved conversation and draft, and stays scoped to its roleplay', async () => {
+  const h = await harness(); h.f.state().turns.push({ role: 'assistant', content: 'Old reply', at: 1 });
+  h.open(); h.click('[data-tab=settings]'); h.click('.reload-state');
+  await until(() => h.root.querySelector('.status')!.textContent!.includes('Reloaded.')); h.click('[data-tab=chat]');
+  const draft = h.root.querySelector<HTMLTextAreaElement>('.ask')!;
+  draft.value = 'Unsent draft'; draft.dispatchEvent(new h.dom.window.Event('input'));
+  h.click('.new-kazz-chat'); expect(h.root.querySelector<HTMLElement>('.reset-chat-confirm')!.hidden).toBe(false);
+  h.click('.cancel-reset-chat'); expect(h.requests.some(r => r.action === 'resetChat')).toBe(false);
+  expect(h.f.state().turns[0].content).toBe('Old reply');
+  h.click('.new-kazz-chat'); h.click('.confirm-reset-chat');
+  await until(() => !!h.root.querySelector('.chat-empty'));
+  expect(h.f.state().turns).toHaveLength(0); expect(h.root.querySelector<HTMLTextAreaElement>('.ask')!.value).toBe('');
+  expect(h.f.state().settings.connectionId).toBe('connection'); expect(h.f.updates).toHaveLength(0);
+  h.click('.new-kazz-chat'); h.switch('chat-b'); await until(() => h.root.querySelector('.chat-name')!.textContent === 'Other chat');
+  expect(h.root.querySelector<HTMLElement>('.reset-chat-confirm')!.hidden).toBe(true);
+});
+
+
+test('Reset widget position restores an off-screen mascot and keeps mobile peeking and chat data', async () => {
+  const h = await harness(), pet = h.widgets[0];
+  const button = pet.root.shadowRoot!.querySelector<HTMLButtonElement>('button')!;
+  button.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+  pet.x = 5000; pet.y = 5000;
+  h.open(); h.click('.quick-settings'); h.click('.recover-widget');
+  expect(pet.visible).toBe(true); expect(h.widgets[1].visible).toBe(false);
+  expect(pet.x).toBeLessThan(h.dom.window.innerWidth); expect(pet.y).toBeLessThan(h.dom.window.innerHeight);
+  expect(h.widgets).toHaveLength(2); expect(h.f.state().settings.connectionId).toBe('connection'); expect(h.f.updates).toHaveLength(0);
+  Object.defineProperty(h.dom.window, 'innerWidth', { value: 390, configurable: true }); h.dom.window.dispatchEvent(new h.dom.window.Event('resize'));
+  h.open(); h.click('.recover-widget'); expect(pet.width).toBe(64); expect(pet.height).toBe(84); expect(pet.x).toBe(318);
+  expect(button.classList.contains('peek')).toBe(true);
+});
