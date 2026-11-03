@@ -1,3 +1,4 @@
+import { limitReply, replyLengthInstruction } from './reply-length';
 import { answerPreview } from './answer-stream';
 import { conversationInfo, expectConversation, newConversation, switchConversation } from './conversations';
 import { migrate, storyView, StoryFeatures, type StoryJob } from './story';
@@ -113,7 +114,8 @@ export class KazzService {
       this.live(job);
       if (chunk.type === 'token') response += chunk.token;
       if (chunk.type === 'done') {
-        if (['length', 'max_tokens', 'content_filter'].includes(chunk.finish_reason)) throw new Error('The model response was cut short. Nothing from that response was applied.');
+        if (['length', 'max_tokens', 'max_output_tokens'].includes(chunk.finish_reason.toLowerCase())) throw new Error(`The model response was cut short at its output-token limit. ${preview ? 'Lower Chat reply length or increase' : 'Increase'} Kazz’s output cutoff in Settings. Reasoning and JSON also use that budget. Nothing from this response was applied; completed tool changes stay saved.`);
+        if (chunk.finish_reason.toLowerCase() === 'content_filter') throw new Error('The provider stopped this response with a content filter. Nothing from this response was applied; completed tool changes stay saved.');
         response = chunk.content; complete = true;
       }
       if (response.length > 150_000) throw new Error('The model response exceeded the size limit.');
@@ -167,6 +169,10 @@ export class KazzService {
         job.state.conversation.updatedAt = Date.now();
         await this.save(job);
         return this.view(job);
+      }
+      case 'replyLength': {
+        job.state.settings.chatMaxWords = integer(data.words, 0, 2000);
+        await this.save(job); return this.view(job);
       }
       case 'settings': {
         const next = settings(data.settings), previous = job.state.settings;
@@ -366,7 +372,7 @@ export class KazzService {
     job.state.conversation.updatedAt = Date.now();
     job.state.turns.push({ role: 'user', content: text, at: Date.now() }); job.state.turns = job.state.turns.slice(-100); await this.save(job);
     const results: unknown[] = [];
-    const instruction = `Act as Kazz, a chat-bound assistant. Choose exactly ONE action per response as JSON. Valid forms:
+    const instruction = `Act as Kazz, a chat-bound assistant. ${replyLengthInstruction(job.state.settings.chatMaxWords)} Choose exactly ONE action per response as JSON. Valid forms:
 {"action":"answer","text":"your reply"} — put action first and text second so the reader-facing text can stream.
 {"action":"search","query":"literal text","offset":0} searches the ENTIRE current chat, 20 results/page.
 {"action":"read","messageId":"id"} reads one current-chat message.
@@ -381,7 +387,8 @@ Keep answer text under 20,000 characters. Use only supported actions. Never modi
       let shown = '', lastSent = 0, lastSize = 0;
       const preview = (response: string) => {
         if (shown.length >= 20_000 || (Date.now() - lastSent < 40 && response.length - lastSize < 64)) return;
-        const text = answerPreview(response);
+        const decoded = answerPreview(response);
+        const text = decoded === undefined ? undefined : limitReply(decoded, job.state.settings.chatMaxWords).text;
         if (text === undefined || text === shown) return;
         shown = text; lastSent = Date.now(); lastSize = response.length;
         this.send(job.request, job.user, job.binding.session, { stream: { conversationId: job.state.conversation.id, text } });
@@ -389,7 +396,8 @@ Keep answer text under 20,000 characters. Use only supported actions. Never modi
       const action = parseJSON(await this.model(job, instruction + (step === 8 ? '\nNo tool steps remain; respond with answer now.' : ''), { userRequest: text, conversation: job.state.turns.slice(-12), context: await this.context(job), toolResults: results }, job.state.settings.maxOutputTokens, preview));
       if (action.action === 'answer') {
         job.state.conversation.updatedAt = Date.now();
-        job.state.turns.push({ role: 'assistant', content: string(action.text, 'Reply', 20_000), at: Date.now() }); job.state.turns = job.state.turns.slice(-100); await this.save(job); return;
+        const reply = limitReply(string(action.text, 'Reply', 20_000), job.state.settings.chatMaxWords);
+        job.state.turns.push({ role: 'assistant', content: reply.text, at: Date.now(), ...(reply.limited ? { wordLimit: job.state.settings.chatMaxWords } : {}) }); job.state.turns = job.state.turns.slice(-100); await this.save(job); return;
       }
       if (shown) throw new Error('The model changed its answer format. The partial reply was not saved; try again.');
       if (step === 8) throw new Error('Kazz reached the tool-step limit. Completed changes are saved; ask a narrower follow-up.');

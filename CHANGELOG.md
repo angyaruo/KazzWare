@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.4 — Conversational reply length
+
+- Add Reply length beside Send in Chat: Brief (40 words), Chat (80, default), Detailed (200), No cap, and custom values up to 2,000 words. Keep the unsent draft when saving. The same per-roleplay setting is available in Configuration; existing history stays intact.
+- Prompt Kazz for casual back-and-forth and enforce the word cap on streamed and saved answer dialogue, with a label when shortened. Use Unicode word boundaries. Message edits, summaries, lorebooks and tool arguments keep their existing requirements.
+- Keep the output-token ceiling independent and forwarded on every model call. Recognize the Responses API’s max_output_tokens and case variants when a response is cut short; explain that reasoning and JSON also use the output budget. Reject incomplete replies as before; completed tool changes remain saved.
+- Rebuild bundles and preview; cover settings migration, strict word limits, streaming, tool exemptions, provider finish reasons and the quick control. No new dependencies or permissions.
+
 ## 0.7.3 — Saved Kazz chats and streaming
 
 - Rework Chat around Kazz leaning directly on Your direct line. Use a small + for a fresh chat and an ellipsis with Manage chats and Clear history. New chats archive the previous conversation; reopening restores it. Clearing the current conversation and deleting a saved one require separate confirmations.

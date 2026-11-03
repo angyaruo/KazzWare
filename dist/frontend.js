@@ -45,7 +45,7 @@ function typingBubble(ctx, anchor, options) {
 
 // src/shared.ts
 var CHANNEL = "kazzware.v1";
-var DEFAULTS = { connectionId: "", maxOutputTokens: 8192, slop: ["a shiver ran down", "a testament to", "couldn’t help but", "could not help but", "orbs"], wholeWords: true, galleryEnabled: false, commentaryEnabled: false, commentaryDuration: 14, commentaryWidth: 280, commentaryInterval: 1, mobilePeek: true, interval: 5, format: "random", contextMessages: 30, mascotSize: 110, autoName: false, nameInterval: 20, timelineAuto: false, timelineInject: false, spoilersEnabled: false };
+var DEFAULTS = { connectionId: "", maxOutputTokens: 8192, chatMaxWords: 80, slop: ["a shiver ran down", "a testament to", "couldn’t help but", "could not help but", "orbs"], wholeWords: true, galleryEnabled: false, commentaryEnabled: false, commentaryDuration: 14, commentaryWidth: 280, commentaryInterval: 1, mobilePeek: true, interval: 5, format: "random", contextMessages: 30, mascotSize: 110, autoName: false, nameInterval: 20, timelineAuto: false, timelineInject: false, spoilersEnabled: false };
 function object(value) {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new Error("Expected an object.");
@@ -89,6 +89,8 @@ var CHAT_CSS = `
 .chat-layout:has(.chat-manager:not([hidden])),.chat-layout:has(.reset-chat-confirm:not([hidden])){height:auto;min-height:100%}.chat-layout:has(.chat-manager:not([hidden])) .transcript,.chat-layout:has(.reset-chat-confirm:not([hidden])) .transcript{flex:none;max-height:200px}
 @media(max-height:550px){.chat-layout{height:auto;min-height:100%}.transcript{flex:none;max-height:160px}}
 @container kazz (max-width:340px){.chat-perch{height:100px}.chat-perch img{left:1%;height:133px;width:70%}.chat-actions{right:0;gap:5px}.chat-icon{width:36px;min-height:36px}.chat-compose{padding:12px 10px 9px}.chat-session{gap:8px}.chat-session strong{font-size:12px}.chat-compose textarea{font-size:16px}.bubble{font-size:13px;margin-right:10px}.bubble.user{margin-left:16px}}
+.chat-compose:has(.reply-length-popover:not([hidden])){z-index:3}
+.chat-compose-footer{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px}.chat-compose-footer .send{margin:0;flex-shrink:0}.reply-length-controls{position:relative;min-width:0}.reply-length-toggle{font:10px var(--mono);color:#c7cdd6;border:1px solid #65505d;padding:6px 8px;min-height:30px;background:#0e141bd9;border-radius:3px}.reply-length-popover{position:absolute;left:0;bottom:calc(100% + 6px);z-index:4;width:240px;max-width:calc(100vw - 62px);padding:12px;background:#111720;border:1px solid #a44659;border-radius:3px 12px 3px 3px;box-shadow:0 8px 24px #0009;pointer-events:auto}.reply-length-popover>strong{display:block;font-size:13px;margin-bottom:10px}.reply-presets{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin-bottom:12px}.reply-presets button{font-size:11px;min-height:32px;padding:5px;border-color:#65505d;background:#1a202a}.reply-presets button[aria-pressed=true]{background:#e3e7ed;color:#11151b;border-color:#e3e7ed}.reply-length-popover label{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11px}.reply-length-popover input{width:90px;min-height:34px;font-size:14px;padding:5px}.reply-length-popover small{display:block;font-size:10px;line-height:1.5;color:#b9c1cd;margin-top:7px}.reply-length-popover .save-reply-length{display:block;margin:10px 0 0 auto;min-height:30px;font-size:11px;padding:5px 10px}.reply-limit-note{display:block;white-space:normal;font:10px/1.5 var(--mono);color:#b9c1cd;border-top:1px solid #3f4856;margin-top:9px;padding-top:6px}
 @media(prefers-reduced-motion:reduce){.typing-dots i{animation:none}}
 `;
 function paintChatStream(root, stream) {
@@ -111,14 +113,41 @@ function mountChat(root, ui) {
     <div class="chat-composer-block"><div class="chat-perch"><img draggable="false" src="${ui.illustration}" alt="Kazz leaning on your direct line"><div class="chat-actions">
       <button class="new-kazz-chat chat-icon" aria-label="New chat with Kazz" title="New chat · saves this conversation" data-mutate>+</button>
       <div class="chat-options"><button class="chat-more chat-icon" aria-label="More chat options" aria-expanded="false" aria-controls="kazz-chat-options" title="More chat options">…</button><div id="kazz-chat-options" class="chat-popover" hidden><button class="manage-chats">Manage chats</button><button class="clear-chat" data-mutate>Clear history</button></div></div>
-    </div></div><form class="chat-compose"><label for="kazz-ask">YOUR DIRECT LINE / KAZZ</label><textarea id="kazz-ask" class="ask" placeholder="Alright, Kazz…" maxlength="8000">${escapeHTML(ui.draft)}</textarea><button class="primary send" type="submit" data-mutate>Send ↗</button></form></div>
+    </div></div><form class="chat-compose"><label for="kazz-ask">YOUR DIRECT LINE / KAZZ</label><textarea id="kazz-ask" class="ask" placeholder="Alright, Kazz…" maxlength="8000">${escapeHTML(ui.draft)}</textarea><div class="chat-compose-footer"><div class="reply-length-controls"><button class="reply-length-toggle" type="button" aria-label="Chat reply length" aria-expanded="false" aria-controls="kazz-reply-length" data-mutate>${state.settings.chatMaxWords ? `${state.settings.chatMaxWords} words max` : "No word cap"} ▴</button><div id="kazz-reply-length" class="reply-length-popover" role="group" aria-label="Chat reply length options" hidden><strong>Reply length</strong><div class="reply-presets">${[[40, "Brief"], [80, "Chat"], [200, "Detailed"], [0, "No cap"]].map(([words, label]) => `<button type="button" data-reply-words="${words}" aria-pressed="${state.settings.chatMaxWords === words}" data-mutate>${label}</button>`).join("")}</div><label for="kazz-reply-words">Max words<input id="kazz-reply-words" class="reply-words" type="number" min="0" max="2000" step="1" required value="${state.settings.chatMaxWords}"></label><small>0 = no word cap. The token cutoff still applies.</small><button class="save-reply-length" type="button" data-mutate>Set limit</button></div></div><button class="primary send" type="submit" data-mutate>Send ↗</button></div></form></div>
     <section class="chat-manager" aria-label="Saved Kazz chats" hidden><div class="chat-manager-heading"><strong>Saved chats</strong><button class="close-manager chat-icon" aria-label="Close saved chats">×</button></div><small>Saved within this roleplay · ${state.conversations.length} / 50</small><div class="saved-chats">${[...state.conversations].sort((a, b) => b.updatedAt - a.updatedAt).map((c) => `<div class="saved-chat"><button class="open-conversation" data-id="${escapeHTML(c.id)}" data-mutate><strong>${escapeHTML(c.title)}</strong><small>${new Date(c.updatedAt).toLocaleString()} · ${c.turnCount} messages</small></button><button class="delete-conversation chat-icon" data-id="${escapeHTML(c.id)}" aria-label="Delete ${escapeHTML(c.title)}" title="Delete saved chat" data-mutate>×</button></div>`).join("") || "<p>No saved chats yet. + saves this conversation and opens a fresh one.</p>"}</div></section>
     <section class="reset-chat-confirm" role="group" aria-label="Confirm clearing chat history" hidden><p></p><div class="row"><button class="confirm-reset-chat" data-mutate>Clear history</button><button class="cancel-reset-chat">Cancel</button></div></section>
-    <div class="transcript" role="log" aria-label="Conversation with Kazz" tabindex="0">${state.turns.map((t) => `<div class="bubble ${t.role}"><span class="speaker">${t.role === "user" ? "YOU" : "KAZZ"}</span>${escapeHTML(t.content)}</div>`).join("") || '<div class="chat-empty"><strong>I’m listening.</strong><p>Type above to start a conversation.</p></div>'}<div class="chat-pending" hidden><div class="bubble user"><span class="speaker">YOU</span><span class="pending-user"></span></div><div class="bubble assistant" aria-live="off"><span class="speaker">KAZZ</span><span class="typing" role="status" aria-label="Kazz is typing">Kazz is typing<span class="typing-dots" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span></span><span class="stream-text"></span></div></div></div>
+    <div class="transcript" role="log" aria-label="Conversation with Kazz" tabindex="0">${state.turns.map((t) => `<div class="bubble ${t.role}"><span class="speaker">${t.role === "user" ? "YOU" : "KAZZ"}</span>${escapeHTML(t.content)}${t.wordLimit ? `<small class="reply-limit-note">Shortened to ${t.wordLimit} words</small>` : ""}</div>`).join("") || '<div class="chat-empty"><strong>I’m listening.</strong><p>Type above to start a conversation.</p></div>'}<div class="chat-pending" hidden><div class="bubble user"><span class="speaker">YOU</span><span class="pending-user"></span></div><div class="bubble assistant" aria-live="off"><span class="speaker">KAZZ</span><span class="typing" role="status" aria-label="Kazz is typing">Kazz is typing<span class="typing-dots" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span></span><span class="stream-text"></span></div></div></div>
     <small class="chat-disclaimer">Private Kazz chat · edits have Undo.</small></div>`;
   const get = (selector) => root.querySelector(selector);
   const on = (selector, action) => get(selector).addEventListener("click", action);
   const options = get(".chat-popover"), more = get(".chat-more"), manager = get(".chat-manager"), confirm = get(".reset-chat-confirm");
+  const lengths = get(".reply-length-popover"), lengthToggle = get(".reply-length-toggle");
+  function closeLengths() {
+    lengths.hidden = true;
+    lengthToggle.setAttribute("aria-expanded", "false");
+  }
+  on(".reply-length-toggle", () => {
+    if (ui.busy())
+      return;
+    closeOptions();
+    lengths.hidden = !lengths.hidden;
+    lengthToggle.setAttribute("aria-expanded", String(!lengths.hidden));
+  });
+  root.querySelectorAll("[data-reply-words]").forEach((b) => b.addEventListener("click", () => {
+    if (!ui.busy())
+      ui.saveReplyLength(Number(b.dataset.replyWords));
+  }));
+  on(".save-reply-length", () => {
+    const words = get(".reply-words");
+    if (!ui.busy() && words.reportValidity())
+      ui.saveReplyLength(Number(words.value));
+  });
+  get(".reply-words").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      get(".save-reply-length").click();
+    }
+  });
   let deleteId;
   function closeOptions() {
     options.hidden = true;
@@ -139,6 +168,7 @@ function mountChat(root, ui) {
     get(".cancel-reset-chat").focus();
   }
   on(".chat-more", () => {
+    closeLengths();
     options.hidden = !options.hidden;
     more.setAttribute("aria-expanded", String(!options.hidden));
   });
@@ -172,11 +202,18 @@ function mountChat(root, ui) {
   }));
   root.querySelectorAll(".delete-conversation").forEach((b) => b.addEventListener("click", () => showConfirm(b.dataset.id)));
   root.onclick = (event) => {
-    if (!event.target.closest(".chat-options"))
+    const target = event.target;
+    if (!target.closest(".chat-options"))
       closeOptions();
+    if (!target.closest(".reply-length-controls"))
+      closeLengths();
   };
   root.onkeydown = (event) => {
-    if (event.key === "Escape" && (!options.hidden || !confirm.hidden || !manager.hidden)) {
+    if (event.key === "Escape" && !lengths.hidden) {
+      closeLengths();
+      lengthToggle.focus();
+      event.stopPropagation();
+    } else if (event.key === "Escape" && (!options.hidden || !confirm.hidden || !manager.hidden)) {
       closeOptions();
       hideConfirm();
       manager.hidden = true;
@@ -2083,6 +2120,7 @@ function setup(ctx) {
       draftChanged: (text) => {
         askDraft = text;
       },
+      saveReplyLength: (words) => run("replyLength", { words }, words ? `Kazz’s Chat replies: up to ${words} words.` : "Chat word limit off. The output-token cutoff still applies."),
       async action(action, data = {}) {
         const origin = binding;
         const ok = await run(action, { ...data, conversationId }, action === "newConversation" ? view.state.turns.length ? "Fresh chat. Your previous conversation is saved." : "Fresh Kazz chat opened." : action === "switchConversation" ? "Saved conversation opened." : action === "deleteConversation" ? "Saved Kazz chat deleted." : "This Kazz conversation’s history is cleared.");
@@ -2178,8 +2216,8 @@ function setup(ctx) {
   }
   function renderSettings() {
     const s = settingsDraft || view.state.settings;
-    body.innerHTML = `${heading("06 / SETTINGS", "Settings", "HANDLE WITH CARE")}<p class="muted">Saved separately for each chat.</p><label class="field">Kazz’s connection<select class="connection"><option value="">Choose a connection…</option>${view.connections.map((c) => `<option value="${escapeHTML(c.id)}" ${c.id === s.connectionId ? "selected" : ""}>${escapeHTML(c.name)} · ${escapeHTML(c.model)}</option>`).join("")}</select></label><small>Uses this saved connection for every Kazz request. Your roleplay connection stays as it is.</small><label class="field">Kazz’s output cutoff (tokens)<input class="max-output-tokens" type="number" min="256" max="32768" step="1" value="${s.maxOutputTokens}"></label><small>256–32,768 tokens per response; your connection may allow less. Applies to Chat and caps other Kazz tasks. Cut-off or incomplete replies are not saved; completed tool changes remain.</small><label class="field">Recent messages in working context (5–100)<input class="context" type="number" min="5" max="100" value="${s.contextMessages}"></label><label class="field">Gallery interval (normal replies)<input class="interval" type="number" min="1" max="100" value="${s.interval}"></label><label class="field">Gallery format<select class="format">${[["random", "Surprise me"], ["forum", "AITA / discussion forum"], ["thread", "Fandom social thread"], ["wiki", "Unofficial wiki"]].map(([key, label]) => `<option value="${key}" ${key === s.format ? "selected" : ""}>${label}</option>`).join("")}</select></label><label class="field">Mascot size<input class="size" type="range" min="70" max="180" value="${s.mascotSize}"></label><label class="check"><span>Use the mobile peeker</span><input class="mobile-peek" type="checkbox" role="switch" ${s.mobilePeek ? "checked" : ""}></label><div class="row"><button class="primary save-settings" data-mutate>Save settings</button><button class="reload-state">Reload</button><button class="recover-widget">Reset widget position</button></div><div class="note">Context goes to the connection you select. Search can inspect older messages; summaries read the whole chat. Kazz never receives connection API keys.</div>`;
-    const read = () => ({ ...view.state.settings, maxOutputTokens: Number(body.querySelector(".max-output-tokens").value), mobilePeek: body.querySelector(".mobile-peek").checked, connectionId: body.querySelector(".connection").value, contextMessages: Number(body.querySelector(".context").value), interval: Number(body.querySelector(".interval").value), format: body.querySelector(".format").value, mascotSize: Number(body.querySelector(".size").value) });
+    body.innerHTML = `${heading("06 / SETTINGS", "Settings", "HANDLE WITH CARE")}<p class="muted">Saved separately for each chat.</p><label class="field">Kazz’s connection<select class="connection"><option value="">Choose a connection…</option>${view.connections.map((c) => `<option value="${escapeHTML(c.id)}" ${c.id === s.connectionId ? "selected" : ""}>${escapeHTML(c.name)} · ${escapeHTML(c.model)}</option>`).join("")}</select></label><small>Uses this saved connection for every Kazz request. Your roleplay connection stays as it is.</small><label class="field">Max words in Kazz’s Chat replies<input class="chat-max-words" type="number" min="0" max="2000" step="1" value="${s.chatMaxWords}"></label><small>0 = no word cap · up to 2,000 words. Also adjustable beside Send in Chat. Only Kazz’s own dialogue is shortened; edits, summaries and lorebooks keep their task lengths.</small><label class="field">Kazz’s output cutoff (tokens)<input class="max-output-tokens" type="number" min="256" max="32768" step="1" value="${s.maxOutputTokens}"></label><small>256–32,768 output tokens per model call, including reasoning and JSON. This is separate from reply word count; your connection may allow less. Applies to Chat and caps other Kazz tasks. Cut-off or incomplete replies are not saved; completed tool changes remain.</small><label class="field">Recent messages in working context (5–100)<input class="context" type="number" min="5" max="100" value="${s.contextMessages}"></label><label class="field">Gallery interval (normal replies)<input class="interval" type="number" min="1" max="100" value="${s.interval}"></label><label class="field">Gallery format<select class="format">${[["random", "Surprise me"], ["forum", "AITA / discussion forum"], ["thread", "Fandom social thread"], ["wiki", "Unofficial wiki"]].map(([key, label]) => `<option value="${key}" ${key === s.format ? "selected" : ""}>${label}</option>`).join("")}</select></label><label class="field">Mascot size<input class="size" type="range" min="70" max="180" value="${s.mascotSize}"></label><label class="check"><span>Use the mobile peeker</span><input class="mobile-peek" type="checkbox" role="switch" ${s.mobilePeek ? "checked" : ""}></label><div class="row"><button class="primary save-settings" data-mutate>Save settings</button><button class="reload-state">Reload</button><button class="recover-widget">Reset widget position</button></div><div class="note">Context goes to the connection you select. Search can inspect older messages; summaries read the whole chat. Kazz never receives connection API keys.</div>`;
+    const read = () => ({ ...view.state.settings, chatMaxWords: Number(body.querySelector(".chat-max-words").value), maxOutputTokens: Number(body.querySelector(".max-output-tokens").value), mobilePeek: body.querySelector(".mobile-peek").checked, connectionId: body.querySelector(".connection").value, contextMessages: Number(body.querySelector(".context").value), interval: Number(body.querySelector(".interval").value), format: body.querySelector(".format").value, mascotSize: Number(body.querySelector(".size").value) });
     body.querySelectorAll("input,select").forEach((input) => input.addEventListener("input", () => {
       settingsDraft = read();
     }));

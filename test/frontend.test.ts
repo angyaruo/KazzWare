@@ -535,3 +535,30 @@ test('completed stream becomes one saved reply and removes both typing indicator
   expect(h.dom.window.document.querySelector<HTMLElement>('[data-kazzware-owned=typing]')!.hidden).toBe(true);
   expect(h.root.querySelector<HTMLButtonElement>('.new-kazz-chat')!.disabled).toBe(false);
 });
+
+
+test('reply length presets and custom Enter save beside Send without submitting or losing the draft', async () => {
+  const h = await harness(); h.open(); h.click('[data-tab=chat]');
+  const ask = h.root.querySelector<HTMLTextAreaElement>('.ask')!; ask.value = 'Unsent question'; ask.dispatchEvent(new h.dom.window.Event('input'));
+  h.click('.reply-length-toggle'); expect(h.root.querySelector<HTMLElement>('.reply-length-popover')!.hidden).toBe(false);
+  h.click('[data-reply-words="40"]'); await until(() => h.root.querySelector('.reply-length-toggle')!.textContent!.includes('40 words'));
+  expect(h.root.querySelector<HTMLTextAreaElement>('.ask')!.value).toBe('Unsent question');
+  h.click('.reply-length-toggle'); const custom = h.root.querySelector<HTMLInputElement>('.reply-words')!; custom.value = '7';
+  custom.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+  await until(() => h.root.querySelector('.reply-length-toggle')!.textContent!.includes('7 words'));
+  expect(h.requests.some(r => r.action === 'ask')).toBe(false); expect(h.f.modelInputs).toHaveLength(0);
+  h.click('.reply-length-toggle'); h.root.querySelector<HTMLInputElement>('.reply-words')!.value = '2001'; h.click('.save-reply-length');
+  expect(h.f.state().settings.chatMaxWords).toBe(7);
+  h.click('[data-reply-words="0"]'); await until(() => h.root.querySelector('.reply-length-toggle')!.textContent!.includes('No word cap'));
+  h.click('.quick-settings'); expect(h.root.querySelector<HTMLInputElement>('.chat-max-words')!.value).toBe('0');
+});
+
+test('capped replies show their limit as metadata without changing the saved dialogue', async () => {
+  const h = await harness(); h.f.state().settings.chatMaxWords = 2;
+  h.open(); h.click('.quick-settings'); h.click('.reload-state'); await until(() => h.root.querySelector('.status')!.textContent!.includes('Reloaded.'));
+  h.click('[data-tab=chat]'); h.f.outputs.push('{"action":"answer","text":"One two three four."}');
+  const ask = h.root.querySelector<HTMLTextAreaElement>('.ask')!; ask.value = 'Hey'; ask.dispatchEvent(new h.dom.window.Event('input')); h.click('.send');
+  await until(() => h.root.querySelector('.reply-limit-note')?.textContent === 'Shortened to 2 words');
+  expect(h.f.state().turns.at(-1)?.content).toBe('One two…');
+  expect(h.f.state().turns.at(-1)?.content).not.toContain('Shortened');
+});
