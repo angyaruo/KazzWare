@@ -1,4 +1,22 @@
 // @bun
+// src/reply-length.ts
+var segmenter = new Intl.Segmenter(undefined, { granularity: "word" });
+function limitReply(text, maxWords) {
+  if (!maxWords)
+    return { text, limited: false };
+  let words = 0;
+  for (const segment of segmenter.segment(text)) {
+    if (!segment.isWordLike || ++words <= maxWords)
+      continue;
+    const prefix = text.slice(0, segment.index).trimEnd().replace(/[,:;\-\u2013\u2014]+$/u, "").trimEnd();
+    return { text: prefix.endsWith("\u2026") ? prefix : `${prefix}\u2026`, limited: true };
+  }
+  return { text, limited: false };
+}
+function replyLengthInstruction(maxWords) {
+  return `Write Kazz's own answer as a casual back-and-forth chat, not an essay. Prefer one to three short sentences and skip unnecessary recaps, headings and lists.${maxWords ? ` The user has set a strict maximum of ${maxWords} words for your answer text. Finish your thought within that limit, even if earlier replies were longer.` : " Match the detail the user asks for."} This preference applies only to your answer dialogue; tool arguments, message edits, summaries and lorebook content keep their own task requirements.`;
+}
+
 // src/answer-stream.ts
 function answerPreview(source) {
   const prefix = /^\s*(?:```(?:json)?\s*)?\{\s*"action"\s*:\s*"answer"\s*,\s*"text"\s*:\s*"/i.exec(source);
@@ -76,7 +94,7 @@ async function fingerprint(value) {
 
 // src/shared.ts
 var CHANNEL = "kazzware.v1";
-var DEFAULTS = { connectionId: "", maxOutputTokens: 8192, slop: ["a shiver ran down", "a testament to", "couldn\u2019t help but", "could not help but", "orbs"], wholeWords: true, galleryEnabled: false, commentaryEnabled: false, commentaryDuration: 14, commentaryWidth: 280, commentaryInterval: 1, mobilePeek: true, interval: 5, format: "random", contextMessages: 30, mascotSize: 110, autoName: false, nameInterval: 20, timelineAuto: false, timelineInject: false, spoilersEnabled: false };
+var DEFAULTS = { connectionId: "", maxOutputTokens: 8192, chatMaxWords: 80, slop: ["a shiver ran down", "a testament to", "couldn\u2019t help but", "could not help but", "orbs"], wholeWords: true, galleryEnabled: false, commentaryEnabled: false, commentaryDuration: 14, commentaryWidth: 280, commentaryInterval: 1, mobilePeek: true, interval: 5, format: "random", contextMessages: 30, mascotSize: 110, autoName: false, nameInterval: 20, timelineAuto: false, timelineInject: false, spoilersEnabled: false };
 function emptyState() {
   return { version: 1, story: emptyStory(), settings: { ...DEFAULTS, slop: [...DEFAULTS.slop] }, undo: [], turns: [], conversation: { id: "initial", title: "New conversation", createdAt: Date.now(), updatedAt: Date.now() }, conversations: [], summaries: [], pages: [], counted: [], commented: [], commentaryCount: 0, count: 0, lorebooks: [] };
 }
@@ -106,7 +124,7 @@ function settings(value) {
       throw new Error("Invalid toggle.");
   if (!["random", "forum", "thread", "wiki"].includes(String(v.format)))
     throw new Error("Unknown gallery format.");
-  return { connectionId: v.connectionId, maxOutputTokens: integer(v.maxOutputTokens ?? 8192, 256, 32768), slop: [...new Set(v.slop.map((x) => string(x, "Phrase", 200).trim()))], wholeWords: v.wholeWords, galleryEnabled: v.galleryEnabled, commentaryEnabled: v.commentaryEnabled === true, commentaryDuration: v.commentaryDuration === 0 ? 0 : integer(v.commentaryDuration ?? 14, 3, 120), commentaryWidth: integer(v.commentaryWidth ?? 280, 200, 400), commentaryInterval: integer(v.commentaryInterval ?? 1, 1, 50), mobilePeek: v.mobilePeek !== false, interval: integer(v.interval, 1, 100), format: v.format, contextMessages: integer(v.contextMessages, 5, 100), mascotSize: integer(v.mascotSize, 70, 180), autoName: v.autoName === true, nameInterval: integer(v.nameInterval ?? 20, 10, 50), timelineAuto: v.timelineAuto === true, timelineInject: v.timelineInject === true, spoilersEnabled: v.spoilersEnabled === true };
+  return { connectionId: v.connectionId, maxOutputTokens: integer(v.maxOutputTokens ?? 8192, 256, 32768), chatMaxWords: integer(v.chatMaxWords ?? 80, 0, 2000), slop: [...new Set(v.slop.map((x) => string(x, "Phrase", 200).trim()))], wholeWords: v.wholeWords, galleryEnabled: v.galleryEnabled, commentaryEnabled: v.commentaryEnabled === true, commentaryDuration: v.commentaryDuration === 0 ? 0 : integer(v.commentaryDuration ?? 14, 3, 120), commentaryWidth: integer(v.commentaryWidth ?? 280, 200, 400), commentaryInterval: integer(v.commentaryInterval ?? 1, 1, 50), mobilePeek: v.mobilePeek !== false, interval: integer(v.interval, 1, 100), format: v.format, contextMessages: integer(v.contextMessages, 5, 100), mascotSize: integer(v.mascotSize, 70, 180), autoName: v.autoName === true, nameInterval: integer(v.nameInterval ?? 20, 10, 50), timelineAuto: v.timelineAuto === true, timelineInject: v.timelineInject === true, spoilersEnabled: v.spoilersEnabled === true };
 }
 function parseJSON(text) {
   const cleaned = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
@@ -604,8 +622,10 @@ ${instruction}` }, { role: "user", content: JSON.stringify(data) }];
       if (chunk.type === "token")
         response += chunk.token;
       if (chunk.type === "done") {
-        if (["length", "max_tokens", "content_filter"].includes(chunk.finish_reason))
-          throw new Error("The model response was cut short. Nothing from that response was applied.");
+        if (["length", "max_tokens", "max_output_tokens"].includes(chunk.finish_reason.toLowerCase()))
+          throw new Error(`The model response was cut short at its output-token limit. ${preview ? "Lower Chat reply length or increase" : "Increase"} Kazz\u2019s output cutoff in Settings. Reasoning and JSON also use that budget. Nothing from this response was applied; completed tool changes stay saved.`);
+        if (chunk.finish_reason.toLowerCase() === "content_filter")
+          throw new Error("The provider stopped this response with a content filter. Nothing from this response was applied; completed tool changes stay saved.");
         response = chunk.content;
         complete = true;
       }
@@ -671,6 +691,11 @@ ${instruction}` }, { role: "user", content: JSON.stringify(data) }];
         job.state.turns = [];
         job.state.conversation.title = "New conversation";
         job.state.conversation.updatedAt = Date.now();
+        await this.save(job);
+        return this.view(job);
+      }
+      case "replyLength": {
+        job.state.settings.chatMaxWords = integer(data.words, 0, 2000);
         await this.save(job);
         return this.view(job);
       }
@@ -981,7 +1006,7 @@ ${instruction}` }, { role: "user", content: JSON.stringify(data) }];
     job.state.turns = job.state.turns.slice(-100);
     await this.save(job);
     const results = [];
-    const instruction = `Act as Kazz, a chat-bound assistant. Choose exactly ONE action per response as JSON. Valid forms:
+    const instruction = `Act as Kazz, a chat-bound assistant. ${replyLengthInstruction(job.state.settings.chatMaxWords)} Choose exactly ONE action per response as JSON. Valid forms:
 {"action":"answer","text":"your reply"} \u2014 put action first and text second so the reader-facing text can stream.
 {"action":"search","query":"literal text","offset":0} searches the ENTIRE current chat, 20 results/page.
 {"action":"read","messageId":"id"} reads one current-chat message.
@@ -997,7 +1022,8 @@ Keep answer text under 20,000 characters. Use only supported actions. Never modi
       const preview = (response) => {
         if (shown.length >= 20000 || Date.now() - lastSent < 40 && response.length - lastSize < 64)
           return;
-        const text = answerPreview(response);
+        const decoded = answerPreview(response);
+        const text = decoded === undefined ? undefined : limitReply(decoded, job.state.settings.chatMaxWords).text;
         if (text === undefined || text === shown)
           return;
         shown = text;
@@ -1009,7 +1035,8 @@ Keep answer text under 20,000 characters. Use only supported actions. Never modi
 No tool steps remain; respond with answer now.` : ""), { userRequest: text, conversation: job.state.turns.slice(-12), context: await this.context(job), toolResults: results }, job.state.settings.maxOutputTokens, preview));
       if (action.action === "answer") {
         job.state.conversation.updatedAt = Date.now();
-        job.state.turns.push({ role: "assistant", content: string(action.text, "Reply", 20000), at: Date.now() });
+        const reply = limitReply(string(action.text, "Reply", 20000), job.state.settings.chatMaxWords);
+        job.state.turns.push({ role: "assistant", content: reply.text, at: Date.now(), ...reply.limited ? { wordLimit: job.state.settings.chatMaxWords } : {} });
         job.state.turns = job.state.turns.slice(-100);
         await this.save(job);
         return;

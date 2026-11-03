@@ -34,7 +34,9 @@ Kazz leans on **Your direct line**, with a **+** for a fresh conversation. Your 
 
 Keep up to 50 saved conversations per roleplay, each retaining the latest 100 messages (latest 50 shown, with excerpts for long messages). Reaching the saved-chat limit asks you to delete an old conversation; it never silently discards one.
 
-Replies stream into Kazz’s speech bubble, with animated **Kazz is typing…** dots while he thinks or works. Close the menu during a reply and his widget shows the typing bubble instead. Tool instructions stay out of the visible stream. In **Settings**, choose his **output cutoff** from 256–32,768 tokens (default 8,192); your connection may impose a lower limit. Incomplete replies are not saved, and completed tool changes remain available.
+**Want quick back-and-forth instead of paragraphs?** Open **Reply length** beside Send: Brief (40 words), Chat (80, the default), Detailed (200), or No cap. Set any custom maximum from 1–2,000 words; 0 turns the word cap off. This is saved per roleplay and applies to new Kazz dialogue, including its stream. Longer answers are shortened at a word boundary and labeled. Edits, summaries and lorebook content keep their own lengths. The same control is available in Settings.
+
+Replies stream into Kazz’s speech bubble, with animated **Kazz is typing…** dots while he thinks or works. Close the menu during a reply and his widget shows the typing bubble instead. Tool instructions stay out of the visible stream. In **Settings**, choose his **output cutoff** from 256–32,768 tokens **per model call** (default 8,192); your connection may impose a lower limit. Tokens include reasoning and the JSON response format, so they are separate from the visible word cap. A tool-assisted request can involve multiple model calls. Incomplete replies are not saved, and completed tool changes remain available.
 
 This is where his archivist-and-shipper personality gets to run its mouth. His reactions and theories are noncanonical opinions: they do not establish character motives, secret discoveries, the Operator's awareness, or future outcomes.
 
