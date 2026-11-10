@@ -318,7 +318,7 @@ test('mobile peeker docks after a drag and preserves the desktop launcher positi
   const desktop = { x: pet.x, y: pet.y };
   Object.defineProperty(h.dom.window, 'innerWidth', { value: 390, configurable: true });
   h.dom.window.dispatchEvent(new h.dom.window.Event('resize'));
-  expect(pet.width).toBe(64); expect(pet.height).toBe(84); expect(button.classList.contains('peek')).toBe(true);
+  expect(pet.width).toBe(110); expect(pet.height).toBe(110); expect(button.classList.contains('peek')).toBe(true);
   const pointer = (type: string, x: number, y: number) => new h.dom.window.MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 });
   button.dispatchEvent(pointer('pointerdown', 340, 400)); h.dom.window.dispatchEvent(pointer('pointermove', 30, 300)); h.dom.window.dispatchEvent(pointer('pointerup', 30, 300));
   expect(pet.x).toBe(8); expect(button.classList.contains('peek-left')).toBe(true);
@@ -517,7 +517,7 @@ test('Reset widget position restores an off-screen mascot and keeps mobile peeki
   expect(pet.x).toBeLessThan(h.dom.window.innerWidth); expect(pet.y).toBeLessThan(h.dom.window.innerHeight);
   expect(h.widgets).toHaveLength(2); expect(h.f.state().settings.connectionId).toBe('connection'); expect(h.f.updates).toHaveLength(0);
   Object.defineProperty(h.dom.window, 'innerWidth', { value: 390, configurable: true }); h.dom.window.dispatchEvent(new h.dom.window.Event('resize'));
-  h.open(); h.click('.recover-widget'); expect(pet.width).toBe(64); expect(pet.height).toBe(84); expect(pet.x).toBe(318);
+  h.open(); h.click('.recover-widget'); expect(pet.width).toBe(110); expect(pet.height).toBe(110); expect(pet.x).toBe(272);
   expect(button.classList.contains('peek')).toBe(true);
 });
 
@@ -561,4 +561,33 @@ test('capped replies show their limit as metadata without changing the saved dia
   await until(() => h.root.querySelector('.reply-limit-note')?.textContent === 'Shortened to 2 words');
   expect(h.f.state().turns.at(-1)?.content).toBe('One two…');
   expect(h.f.state().turns.at(-1)?.content).not.toContain('Shortened');
+});
+
+
+test('widget style overrides the device, restores each pose position and scales the complete peeker', async () => {
+  const h = await harness(), pet = h.widgets[0], button = pet.root.shadowRoot!.querySelector('button')!;
+  button.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', shiftKey: true, bubbles: true }));
+  const floatingPosition = { x: pet.x, y: pet.y };
+  h.open(); h.click('.quick-settings'); h.click('[data-widget-style=peeking]'); h.click('.save-settings');
+  await until(() => h.f.state().settings.widgetStyle === 'peeking'); await settleView();
+  expect(button.classList.contains('peek')).toBe(true);
+  expect(pet.width).toBe(110); expect(pet.height).toBe(110); expect(pet.x).toBe(h.dom.window.innerWidth - 118);
+  expect(pet.root.shadowRoot!.querySelector('img')!.src).toContain('kazz-peek.png');
+  h.click('.close');
+  button.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'ArrowUp', shiftKey: true, bubbles: true })); const peekY = pet.y;
+  h.open(); h.click('.quick-settings'); h.click('[data-widget-style=floating]'); h.click('.save-settings');
+  await until(() => h.f.state().settings.widgetStyle === 'floating'); await settleView();
+  expect(button.classList.contains('peek')).toBe(false); expect({ x: pet.x, y: pet.y }).toEqual(floatingPosition);
+  Object.defineProperty(h.dom.window, 'innerWidth', { value: 390, configurable: true }); h.dom.window.dispatchEvent(new h.dom.window.Event('resize'));
+  expect(button.classList.contains('peek')).toBe(false); expect(pet.width).toBe(110);
+  h.click('[data-widget-style=peeking]'); const size = h.root.querySelector<HTMLInputElement>('.size')!; size.value = '150'; size.dispatchEvent(new h.dom.window.Event('input'));
+  h.click('.save-settings'); await until(() => h.f.state().settings.mascotSize === 150); await settleView();
+  expect(button.classList.contains('peek')).toBe(true); expect(pet.width).toBe(150); expect(pet.height).toBe(150);
+  expect(pet.x).toBe(232); expect(pet.y).toBe(peekY);
+  expect(pet.x + pet.width).toBeLessThanOrEqual(382);
+  h.click('[data-widget-style=auto]'); h.click('.save-settings'); await until(() => h.f.state().settings.widgetStyle === 'auto'); await settleView();
+  expect(button.classList.contains('peek')).toBe(true);
+  Object.defineProperty(h.dom.window, 'innerWidth', { value: 1024, configurable: true }); h.dom.window.dispatchEvent(new h.dom.window.Event('resize'));
+  expect(button.classList.contains('peek')).toBe(false); expect(pet.root.shadowRoot!.querySelector('img')!.src).toContain('kazz-curled.png');
+  expect(h.widgets).toHaveLength(2); expect(h.f.updates).toHaveLength(0); expect(h.f.modelInputs).toHaveLength(0);
 });

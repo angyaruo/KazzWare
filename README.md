@@ -8,7 +8,7 @@
 
 Kazz is the unauthorized parasite who likes you enough to be useful: obsessive archivist, shameless shipper, vulgar supporter, and a very deliberate stain on your otherwise respectable interface. He floats beside your roleplay, fixes awkward prose, remembers what happened, and gives your fictional fandom far too much material to work with. His own chat and commentary have their own unruly voice; your characters keep theirs.
 
-Drag Kazz wherever you want on desktop, or let his smaller mobile pose peek in from either edge. His glass-and-crimson menu fans out around him and can be moved by its title or artwork. Open him from the floating companion or KazzWare's input-bar action; his work follows the chat you have open.
+Choose **Settings → Widget style → Auto, Peeking, or Floating**. Auto uses the peeker on small screens; either pose can be chosen on any device. Drag floating Kazz freely, or dock peeking Kazz at either edge. The size slider controls both poses, with the full original artwork visible. His glass-and-crimson menu fans out around him and can be moved by its title or artwork. Open him from the floating companion or KazzWare's input-bar action; his work follows the chat you have open.
 
 ## Features
 
@@ -94,7 +94,7 @@ Make sure KazzWare is updated, restart it and refresh Lumiverse. Open a roleplay
 
 ## Your connection, your chat
 
-Kazz can use a different saved connection from your roleplay model. Settings are per chat, including his working-context window, output-token cutoff, gallery preferences, mascot size and mobile pose. His chosen provider receives the story context needed for each request; Lumiverse handles the provider credentials.
+Kazz can use a different saved connection from your roleplay model. Settings are per chat, including his working-context window, output-token cutoff, gallery preferences, mascot size and widget style. His chosen provider receives the story context needed for each request; Lumiverse handles the provider credentials.
 
 Kazz's conversation, preferences, notes, gallery and Undo records are stored per user and chat. His assistant and fandom do not become roleplay messages. Requested edits, swipe merges and title changes affect the current chat; lorebook creation adds a new book attached to that chat. Optional timeline/future-beat context uses Lumiverse's prompt interceptor without rewriting your saved preset.
 

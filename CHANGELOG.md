@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.5 — Full peeker artwork and widget style selection
+
+- Fix the peeker’s oversized image being clipped inside a 64×84 box. Fit the complete original 1254×1254 PNG within a square widget, use smooth browser image rendering, and remove the crop/translation. Hair, hands and tail remain visible at both edges; only the artwork is mirrored on the left.
+- Replace the mobile-only toggle with Auto / Peeking / Floating in Settings. Either pose works on any screen; Auto follows screen width. Migrate the old disabled-mobile-peeker preference to Floating, and keep enabled/default installations on Auto.
+- Apply the size slider to both poses, redock safely after size changes, and preserve independent floating/peeking positions. Keep dragging, opening, commentary anchoring and widget reset behavior.
+- Rebuild bundles and sample preview; add style, migration, resize and position regressions. No new assets, dependencies or permissions.
+
 ## 0.7.4 — Conversational reply length
 
 - Add Reply length beside Send in Chat: Brief (40 words), Chat (80, default), Detailed (200), No cap, and custom values up to 2,000 words. Keep the unsent draft when saving. The same per-roleplay setting is available in Configuration; existing history stays intact.
