@@ -10,7 +10,10 @@ async function harness(plainHTTP = false) {
   // The in-process fake backend shares globals with jsdom; retain its WebCrypto digest.
   Object.defineProperty(dom.window.crypto, 'subtle', { value: globalThis.crypto.subtle });
   // jsdom does not enforce secure-context restrictions; match a browser on LAN HTTP.
-  if (plainHTTP) Object.defineProperty(dom.window.crypto, 'randomUUID', { value: undefined });
+  if (plainHTTP) {
+    Object.defineProperty(dom.window.crypto, 'randomUUID', { value: undefined });
+    Object.defineProperty(dom.window.crypto, 'getRandomValues', { value: undefined });
+  }
   const previous = new Map<string, PropertyDescriptor | undefined>();
   for (const [key, value] of Object.entries({ window: dom.window, document: dom.window.document, Node: dom.window.Node, Element: dom.window.Element, crypto: dom.window.crypto })) { previous.set(key, Object.getOwnPropertyDescriptor(globalThis, key)); Object.defineProperty(globalThis, key, { configurable: true, value }); }
   cleanups.push(() => { dom.window.close(); for (const [key, descriptor] of previous) { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else Reflect.deleteProperty(globalThis, key); } });
@@ -23,6 +26,7 @@ async function harness(plainHTTP = false) {
   let holdMessages = false; const held: unknown[] = [];
   f.api.sendToFrontend = payload => { f.replies.push(payload); if (holdMessages && requests.find(r => r.id === payload.id)?.action === 'message') held.push(payload); else onBackend(payload); };
   const ctx = {
+    frontendSessionId: 'ui-session',
     deferReady() {}, ready() { ready = true; },
     onBackendMessage(callback: typeof onBackend) { onBackend = callback; return sub(); },
     sendToBackend(payload: Parameters<typeof f.service.receive>[0]) { requests.push(payload as typeof requests[number]); void f.service.receive(payload, 'alice', 'ui-session'); },
@@ -43,7 +47,7 @@ async function harness(plainHTTP = false) {
       createSandboxFrame() { return { element: dom.window.document.createElement('iframe'), onMessage() {}, destroy() {} }; }
     },
   };
-  const teardown = setup(ctx as unknown as SpindleFrontendContext); cleanups.push(teardown);
+  const teardown = await setup(ctx as unknown as SpindleFrontendContext); cleanups.push(teardown);
   const root = widgets[1].root.shadowRoot!;
   const click = (selector: string) => { const element = root.querySelector<HTMLButtonElement>(selector); if (!element) throw new Error(`Missing ${selector}`); element.click(); };
   await until(() => root.querySelector('.chat-name')?.textContent === 'The Lighthouse');
@@ -67,7 +71,10 @@ async function harness(plainHTTP = false) {
 
 test('plain HTTP without randomUUID starts the mascot, both menu actions, and chat switching', async () => {
   const h = await harness(true);
-  expect(globalThis.crypto.randomUUID).toBeUndefined();
+  expect(globalThis.crypto.randomUUID).toBeUndefined(); expect(globalThis.crypto.getRandomValues).toBeUndefined();
+  const identity = h.requests.find(r => r.action === 'bind')!.client;
+  expect(h.f.uuidCalls).toContain(identity);
+  expect(identity).toMatch(/^[0-9a-f-]{36}$/);
   expect(h.ready).toBe(true); expect(h.widgets).toHaveLength(2);
   expect(h.widgets[0].visible).toBe(true); expect(h.widgets[1].visible).toBe(false);
   h.widgets[0].root.shadowRoot!.querySelector('button')!.click(); expect(h.widgets[1].visible).toBe(true);

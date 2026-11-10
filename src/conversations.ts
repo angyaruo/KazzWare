@@ -13,9 +13,9 @@ function archive(state: State) {
   if (state.conversations.length >= MAX_CONVERSATIONS) throw new Error('There are 50 saved conversations in this roleplay. Delete an old one in Manage chats first.');
   state.conversations.push({ ...state.conversation, turns: state.turns });
 }
-export function newConversation(state: State) {
+export function newConversation(state: State, id: string) {
   archive(state);
-  state.conversation = { id: crypto.randomUUID(), title: 'New conversation', createdAt: Date.now(), updatedAt: Date.now() };
+  state.conversation = { id, title: 'New conversation', createdAt: Date.now(), updatedAt: Date.now() };
   state.turns = [];
 }
 export function switchConversation(state: State, id: string) {

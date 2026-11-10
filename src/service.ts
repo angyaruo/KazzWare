@@ -1,3 +1,4 @@
+import { hostUUID, identityRequest } from './identity';
 import { limitReply, replyLengthInstruction } from './reply-length';
 import { answerPreview } from './answer-stream';
 import { conversationInfo, expectConversation, newConversation, switchConversation } from './conversations';
@@ -28,6 +29,9 @@ export class KazzService {
   private cancel(binding: Binding) { for (const controller of binding.controllers) controller.abort(); }
   dispose() { for (const binding of this.bindings.values()) this.cancel(binding); this.bindings.clear(); }
   async receive(payload: unknown, user: string, session?: string): Promise<void> {
+    // Keep cancellation synchronous up to the controller abort. UUID bootstrap
+    // is the only message that needs this extra asynchronous routing step.
+    if (payload && typeof payload === 'object' && 'action' in payload && payload.action === 'identity') { await identityRequest(this.api, payload, user, session); return; }
     let req: Request;
     try {
       const v = object(payload);
@@ -89,7 +93,7 @@ export class KazzService {
     if (job.signal.aborted || now !== job.binding || now.chatId !== job.request.chatId) throw new Error('The active chat changed. Request cancelled.');
   }
   private progress(job: Job, progress: string) { this.send(job.request, job.user, job.binding.session, { progress }); }
-  private async save(job: Job) { await this.api.userStorage.setJson(this.path(job.request.chatId!), job.state, { userId: job.user }); }
+  private async save(job: Job) { this.live(job); await this.api.userStorage.setJson(this.path(job.request.chatId!), job.state, { userId: job.user }); }
   private async messages(job: Job): Promise<Message[]> { this.live(job); return (await this.api.chat.getMessages(job.request.chatId!)).map(messageView).sort((a, b) => a.index_in_chat - b.index_in_chat); }
   private async view(job: Job): Promise<View> {
     const [chat, messages, connections] = await Promise.all([this.api.chats.get(job.request.chatId!, job.user), this.messages(job), this.api.connections.list(job.user)]);
@@ -148,7 +152,7 @@ export class KazzService {
       case 'bind': case 'load': return this.view(job);
       case 'newConversation': {
         expectConversation(job.state, data.conversationId);
-        newConversation(job.state); await this.save(job); return this.view(job);
+        newConversation(job.state, await hostUUID(this.api)); await this.save(job); return this.view(job);
       }
       case 'switchConversation': {
         expectConversation(job.state, data.conversationId);
@@ -237,7 +241,7 @@ export class KazzService {
         if (data.kind === 'vote') page.votes = page.votes.includes(postId) ? page.votes.filter(id => id !== postId) : [...page.votes, postId];
         else if (data.kind === 'comment') {
           if (page.comments.length >= 200) throw new Error('This page has reached its 200-comment limit.');
-          page.comments.push({ id: crypto.randomUUID(), postId, body: string(data.text, 'Comment', 2000), author: 'You' });
+          page.comments.push({ id: await hostUUID(this.api), postId, body: string(data.text, 'Comment', 2000), author: 'You' });
         } else throw new Error('Unknown gallery interaction.');
         await this.save(job); return this.view(job);
       }
@@ -297,7 +301,7 @@ export class KazzService {
   private async applyEdit(job: Job, original: Message, after: string, label: string) {
     this.live(job);
     if (!sameMessage((await this.messages(job)).find(x => x.id === original.id), original.content, original.swipe_id)) throw new Error('The message changed while Kazz was working. No edit was applied.');
-    const entry = { id: crypto.randomUUID(), label, messageId: original.id, before: original.content, after, swipe: original.swipe_id, createdAt: Date.now(), status: 'prepared' as const };
+    const entry = { id: await hostUUID(this.api), label, messageId: original.id, before: original.content, after, swipe: original.swipe_id, createdAt: Date.now(), status: 'prepared' as const };
     job.state.undo = [...job.state.undo.slice(-19), entry];
     // Write-ahead record: a crash or failed response can never leave an unrecorded edit.
     await this.save(job);
@@ -331,7 +335,7 @@ export class KazzService {
     this.live(job);
     const current = await this.messages(job);
     if (JSON.stringify(source) !== JSON.stringify(current)) throw new Error('The chat changed during summarization. Run it again for a consistent summary.');
-    const entry = { id: crypto.randomUUID(), text: summary, throughMessage: source.at(-1)!.id, messages: source.length, createdAt: Date.now() };
+    const entry = { id: await hostUUID(this.api), text: summary, throughMessage: source.at(-1)!.id, messages: source.length, createdAt: Date.now() };
     job.state.summaries = [...job.state.summaries.slice(-9), entry]; await this.save(job);
     return entry;
   }
@@ -364,7 +368,7 @@ export class KazzService {
     const throughMessage = triggerId || context.messages.at(-1)?.id || '';
     const result = parseJSON(await this.model(job, `Write a fictional fandom page about this roleplay. Format: ${format}. Forum: an AITA-style post in a character's voice and commenters arguing. Thread: fake fandom accounts, ships, funny beef, different opinions. Wiki: fan-written article sections and disputed trivia. Stay grounded in the supplied events. Do not progress the roleplay or pretend this is a real external website. Return JSON {"title":"...","posts":[{"author":"...","title":"...","body":"..."}]}, 3–8 posts/sections. Body is plain text.`, { context }, 6000));
     if (!Array.isArray(result.posts) || result.posts.length < 1 || result.posts.length > 12) throw new Error('Invalid fandom page.');
-    const page: GalleryPage = { id: crypto.randomUUID(), title: string(result.title, 'Page title', 180), format, createdAt: Date.now(), throughMessage, votes: [], comments: [], posts: result.posts.map(raw => { const v = object(raw); return { id: crypto.randomUUID(), author: string(v.author, 'Author', 100), title: typeof v.title === 'string' ? v.title.slice(0, 200) : '', body: string(v.body, 'Post', 8000) }; }) };
+    const page: GalleryPage = { id: await hostUUID(this.api), title: string(result.title, 'Page title', 180), format, createdAt: Date.now(), throughMessage, votes: [], comments: [], posts: await Promise.all(result.posts.map(async raw => { const v = object(raw); return { id: await hostUUID(this.api), author: string(v.author, 'Author', 100), title: typeof v.title === 'string' ? v.title.slice(0, 200) : '', body: string(v.body, 'Post', 8000) }; })) };
     this.live(job); job.state.pages = [...job.state.pages.slice(-29), page]; await this.save(job);
   }
   private async ask(job: Job, text: string) {

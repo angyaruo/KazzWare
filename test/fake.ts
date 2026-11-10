@@ -8,9 +8,12 @@ export function fake() {
   const chats = new Map([['chat-a', { id: 'chat-a', character_id: 'character', name: 'The Lighthouse', metadata: { custom: true, chat_world_book_ids: ['existing'] } }], ['chat-b', { id: 'chat-b', character_id: 'character', name: 'Other chat', metadata: {} }]]);
   const messages = new Map<string, FakeMessage[]>([['chat-a', [{ id: 'm1', content: 'He watched the pale orbs. Then he waited.', name: 'Elias', is_user: false, swipe_id: 0, index_in_chat: 0 }]], ['chat-b', [{ id: 'm2', content: 'Different story.', name: 'Ari', is_user: false, swipe_id: 0, index_in_chat: 0 }]]]);
   let failSave = 0, saves = 0, finish = 'stop';
+  let uuidSequence = 0; const uuidCalls: string[] = [];
   let gate: (() => Promise<void>) | undefined;
   let chunks: string[] | undefined, tokenGate: ((index: number) => Promise<void>) | undefined;
   const api = {
+    host: { capabilities: { 'uuid-v1': 1 } as Record<string, number> },
+    uuid: { v4: async () => { const id = `00000000-0000-4000-8000-${String(++uuidSequence).padStart(12, '0')}`; uuidCalls.push(id); return id; } },
     sendToFrontend: (reply: Reply) => { replies.push(structuredClone(reply)); },
     chats: { get: async (id: string, user: string) => user === 'alice' ? structuredClone(chats.get(id)) : null, update: async (id: string, input: Record<string, unknown>) => { const c = { ...chats.get(id)!, ...input }; chats.set(id, c); return c; }, getMemories: async () => [] },
     chat: { getMessages: async (id: string) => structuredClone(messages.get(id) || []), updateMessage: async (chat: string, id: string, patch: { content?: string; swipes?: string[]; swipe_id?: number; swipe_dates?: number[] }) => { const m = messages.get(chat)!.find(m => m.id === id)!; if (patch.swipes) m.swipes = [...patch.swipes]; if (patch.swipe_dates) m.swipe_dates = [...patch.swipe_dates]; if (patch.swipe_id !== undefined) m.swipe_id = patch.swipe_id; if (patch.content !== undefined) { m.content = patch.content; if (m.swipes?.length) m.swipes[m.swipe_id] = patch.content; } else if (m.swipes?.length) m.content = m.swipes[m.swipe_id]; updates.push({ chat, id, content: m.content }); } },
@@ -34,7 +37,7 @@ export function fake() {
   function state(id = 'chat-a') { return store.get(`alice/chats/${id}.json`) || emptyState(); }
   async function ready() { const s = emptyState(); s.settings.connectionId = 'connection'; store.set('alice/chats/chat-a.json', s); await request('bind'); }
   function editData() { const m = messages.get('chat-a')![0]; return { messageId: m.id, expected: m.content, swipe: m.swipe_id, direction: 'Use simpler wording' }; }
-  return { service, api, store, replies, updates, modelInputs, outputs, books, chats, messages, request, ready, state, editData,
+  return { service, api, store, replies, uuidCalls, updates, modelInputs, outputs, books, chats, messages, request, ready, state, editData,
     switchChat(id: string | null) { chatId = id; binding = `binding-${++sequence}`; return request('bind'); },
     stream(tokens: string[], afterToken?: (index: number) => Promise<void>) { chunks = tokens; tokenGate = afterToken; },
     setGate(fn: (() => Promise<void>) | undefined) { gate = fn; }, failNextSave(offset = 1) { failSave = saves + offset; }, setFinish(value: string) { finish = value; } };

@@ -1,18 +1,26 @@
-# KazzWare 0.7.5 architecture
+# KazzWare 0.7.6 architecture
 
 Kazz's shared personality is the `PERSONA` constant in `src/service.ts`. Every model request receives it before the task instruction. The owner's voice paragraph applies to Kazz's own dialogue and reader-facing reactions; shipping and speculation are noncanonical opinions. Task instructions preserve source voice for edits/merges and factual output for continuity records. The paragraph is shipped in the backend rather than stored in per-chat settings.
 
 ## Runtime and dependencies
 
-The baseline is Lumiverse main `3d74148383dded2b379f204532cf375b52bcd201`, version 1.2.5, with `lumiverse-spindle-types` 0.6.49. Staging-only APIs are not required. Bun 1.4.4 builds two ESM bundles; TypeScript 5.9.3 checks the SDK contract. Bun's test runner and jsdom 26.1.0 exercise backend operations and frontend DOM handlers. `@types/bun` 1.3.11 and `@types/jsdom` 21.1.7 are development types only. The npm lockfile contains the complete transitive toolchain; no npm dependency is imported by the deployed extension.
+The UUID compatibility baseline is Lumiverse staging `68c0fa961f0ef4cffa72ee0557aaadffa3ced2f1`, version 1.3.0, with `lumiverse-spindle-types` 0.6.79. This build requires the `uuid-v1` host capability, which is not present in the current main 1.2.5 baseline. KazzWare 0.7.5 remains the compatible version for older hosts. Bun 1.4.4 builds two ESM bundles; TypeScript 5.9.3 checks the SDK contract. Bun's test runner and jsdom 26.1.0 exercise backend operations and frontend DOM handlers. `@types/bun` 1.3.11 and `@types/jsdom` 21.1.7 are development types only. The npm lockfile contains the complete transitive toolchain; no npm dependency is imported by the deployed extension.
 
 `shared.ts` defines the versioned wire protocol, persistence types, validation, exact source-range replacement and literal slop matching. `service.ts` contains the backend service and the bounded assistant tool loop. `frontend.ts` owns host UI handles, state subscriptions, correlation IDs and teardown. `message-targeting.ts` chooses a mounted message using the host DOM facade and its visible geometry. `gallery.ts` escapes all model/user strings and produces the complete iframe document. `style.ts` scopes presentation inside extension-owned shadow roots. A removable document style loads the bundled font, outlines marked native targets, and makes this panel's two host wrapper divs ignore pointer hits. Bundles contain the original art as data URLs; no large images travel through frontend/backend messages.
 
 ## Ownership and cancellation
 
-The host-authenticated user ID comes from `onFrontendMessage`, never from the payload. Every request has a random document client ID, chat binding token and request ID. Session routing uses the host frontend-session ID when present; payload matching still rejects responses belonging to a different document or binding. `chats.get(chatId, userId)` validates access before the message facade is used. Every generation explicitly supplies both `userId` and the user-selected `connection_id`.
+The host-authenticated user ID comes from `onFrontendMessage`, never from the payload. Startup obtains a document client UUID from `spindle.uuid.v4()` through the authenticated frontend-session route before constructing the UI. Each binding/request correlation tag combines that UUID and an incrementing counter. Session routing requires the host frontend-session ID for identity bootstrap; payload matching still rejects responses belonging to a different document or binding. `chats.get(chatId, userId)` validates access before the message facade is used. Every generation explicitly supplies both `userId` and the user-selected `connection_id`.
 
 Changing chats replaces the binding and aborts all old controllers. Responses from the old binding cannot update the UI. Jobs serialize per user/chat, including across tabs, so extension writes and state saves cannot race each other. The last 500 request promises are deduplicated in memory; the last 2000 gallery-trigger message IDs are stored durably. A job times out after 10 minutes. Stop aborts unfinished generations; completed edits and their Undo records remain.
+
+## UUID identity and compatibility
+
+`identity.ts` uses the public backend-only `spindle.uuid.v4(): Promise<string>` API, checking `api.host.capabilities['uuid-v1'] >= 1` and the v4 method before calling it. Every returned ID must match the canonical lowercase v4 format. There is no local UUID generator or fallback to browser random-byte APIs or Node crypto. SDK 0.6.79 documents the contract; the manifest requires Lumiverse 1.3.0, while the capability check remains authoritative for the running build.
+
+The frontend setup is asynchronous and calls `deferReady` before requesting an identity. A short-lived nonce combines the host document identity, clocks and a setup counter solely to correlate the bootstrap response. The backend uses the authenticated callback user/session, never a payload-supplied destination, and refuses to broadcast without a session. Missing capabilities and helper failures produce a routed error. The temporary listener/timer are removed on success, error or a 15-second timeout; ordinary UI/RPC setup begins only after a valid host UUID arrives. Binding/request tags derive from that client UUID and a sequence, so ordinary calls do not require another UUID round trip. Reinitialization obtains a fresh client UUID.
+
+All persistent record IDs now await the host helper. Existing IDs—including older conversation, Undo, Gallery and timeline records—are preserved. A save checks its active binding after UUID allocation; native writes retain their source rereads and cancellation checks. Ordinary cancel messages keep their synchronous controller-abort path. Content fingerprints continue to use backend Web Crypto SHA-256 for stale-source detection and deduplication; those are hashes, not identifiers, and changing their format would invalidate existing records. The extension does not import `node:crypto`.
 
 ## Immediate edits and Undo
 
@@ -78,6 +86,8 @@ The per-roleplay `widgetStyle` setting accepts `auto`, `peeking` and `floating`.
 Both original PNGs are square and remain unchanged. `mascot-layout.ts` sizes the widget to `mascotSize` in both dimensions (70–180 pixels, default 110), and CSS uses the full 100% image with `object-fit: contain` and `image-rendering: auto`. The former 96-pixel inner image, 64×84 clipped peeker box and outer translation are removed. Only the image is mirrored at the left edge; the status indicator remains upright. Each pose keeps its own coordinates; changing size or resizing the viewport clamps/redocks using the actual widget dimensions. No new host capabilities or image downloads are involved.
 
 ## Sources
+
+- [UUID helper contract (verified staging source)](https://github.com/prolix-oc/Lumiverse/blob/68c0fa961f0ef4cffa72ee0557aaadffa3ced2f1/developer-docs/docs/backend-api/uuid.md)
 
 - [Lumiverse developer docs](https://docs.lumiverse.chat/)
 - [Manifest and permissions](https://docs.lumiverse.chat/getting-started/manifest/)

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.6 — Lumiverse UUID helper migration
+
+- Use the public asynchronous `spindle.uuid.v4()` API for new conversation, Undo, Notebook, Gallery, swipe-merge, title-history, timeline and future-event IDs. Keep all previously saved IDs unchanged.
+- Bootstrap the browser’s client identity through the authenticated per-document backend route. Derive binding/request correlation tags from that host UUID and a local counter; remove browser UUID/random-byte generation. Startup works without browser crypto ID APIs on LAN HTTP.
+- Validate helper availability through `uuid-v1`, validate returned UUIDs, and report host/transport failures clearly. Guard saved state against cancellation during asynchronous UUID allocation. SHA-256 content fingerprints remain unchanged.
+- Require Lumiverse 1.3.0+ with `uuid-v1` (currently staging), and update the development SDK to 0.6.79. No new runtime dependencies or permissions. Older Lumiverse installations should remain on KazzWare 0.7.5 until the host helper is available.
+- Update regression tests, bundles, deterministic preview and compatibility documentation.
+
 ## 0.7.5 — Full peeker artwork and widget style selection
 
 - Fix the peeker’s oversized image being clipped inside a 64×84 box. Fit the complete original 1254×1254 PNG within a square widget, use smooth browser image rendering, and remove the crop/translation. Hair, hands and tail remain visible at both edges; only the artwork is mirrored on the left.
