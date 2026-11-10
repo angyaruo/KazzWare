@@ -24,3 +24,12 @@ test('textarea normalized newlines map back to original source offsets', () => {
   expect(replaceRange(source, range, 'changed')).toBe('🌑\r\nfirst\rchanged\r\nlast');
   expect(textareaOffset(source, range.start)).toBe(start);
 });
+
+
+test('widget style validation preserves the legacy mobile preference and permits both poses on any device', () => {
+  for (const widgetStyle of ['auto', 'peeking', 'floating'] as const) expect(settings({ ...DEFAULTS, widgetStyle }).widgetStyle).toBe(widgetStyle);
+  expect(() => settings({ ...DEFAULTS, widgetStyle: 'broken' })).toThrow('widget style');
+  const { widgetStyle, ...legacy } = DEFAULTS;
+  expect(settings({ ...legacy, mobilePeek: false }).widgetStyle).toBe('floating');
+  expect(settings({ ...legacy, mobilePeek: true }).widgetStyle).toBe('auto');
+});

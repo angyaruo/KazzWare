@@ -193,3 +193,14 @@ test('failed conversation reset leaves saved turns intact; queued reset retires 
   expect((await ask).ok).toBe(true); expect((await reset).ok).toBe(true);
   expect((await f.request('load')).result).toMatchObject({ state: { turns: [] } });
 });
+
+
+test('stored legacy widget preferences migrate without changing saved chat data', async () => {
+  const f = fake(); await f.ready(); Reflect.deleteProperty(f.state().settings, 'widgetStyle'); f.state().settings.mobilePeek = false;
+  f.state().turns.push({ role: 'user', content: 'Keep this conversation', at: 1 });
+  const response = await f.request('load'); expect(response.result).toMatchObject({ state: { settings: { widgetStyle: 'floating' }, turns: [{ content: 'Keep this conversation' }] } });
+  const migrated = { ...f.state().settings, widgetStyle: 'floating' as const };
+  await f.request('settings', { settings: { ...migrated, widgetStyle: 'peeking' } });
+  expect(f.state().settings.widgetStyle).toBe('peeking'); expect(f.state().turns[0].content).toBe('Keep this conversation');
+  expect(f.modelInputs).toHaveLength(0); expect(f.updates).toHaveLength(0);
+});

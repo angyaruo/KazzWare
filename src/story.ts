@@ -10,7 +10,7 @@ export type StoryJob = {
 };
 export function migrate(state: State) {
   migrateConversations(state);
-  state.settings = { ...DEFAULTS, ...state.settings };
+  state.settings = { ...DEFAULTS, ...state.settings, widgetStyle: state.settings.widgetStyle ?? (state.settings.mobilePeek === false ? 'floating' : 'auto') };
   state.commented ??= []; state.commentaryCount ??= 0; state.story = { ...emptyStory(), ...state.story };
   return state;
 }

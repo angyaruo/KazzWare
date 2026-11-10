@@ -94,7 +94,7 @@ async function fingerprint(value) {
 
 // src/shared.ts
 var CHANNEL = "kazzware.v1";
-var DEFAULTS = { connectionId: "", maxOutputTokens: 8192, chatMaxWords: 80, slop: ["a shiver ran down", "a testament to", "couldn\u2019t help but", "could not help but", "orbs"], wholeWords: true, galleryEnabled: false, commentaryEnabled: false, commentaryDuration: 14, commentaryWidth: 280, commentaryInterval: 1, mobilePeek: true, interval: 5, format: "random", contextMessages: 30, mascotSize: 110, autoName: false, nameInterval: 20, timelineAuto: false, timelineInject: false, spoilersEnabled: false };
+var DEFAULTS = { connectionId: "", maxOutputTokens: 8192, chatMaxWords: 80, slop: ["a shiver ran down", "a testament to", "couldn\u2019t help but", "could not help but", "orbs"], wholeWords: true, galleryEnabled: false, commentaryEnabled: false, commentaryDuration: 14, commentaryWidth: 280, commentaryInterval: 1, mobilePeek: true, widgetStyle: "auto", interval: 5, format: "random", contextMessages: 30, mascotSize: 110, autoName: false, nameInterval: 20, timelineAuto: false, timelineInject: false, spoilersEnabled: false };
 function emptyState() {
   return { version: 1, story: emptyStory(), settings: { ...DEFAULTS, slop: [...DEFAULTS.slop] }, undo: [], turns: [], conversation: { id: "initial", title: "New conversation", createdAt: Date.now(), updatedAt: Date.now() }, conversations: [], summaries: [], pages: [], counted: [], commented: [], commentaryCount: 0, count: 0, lorebooks: [] };
 }
@@ -122,9 +122,11 @@ function settings(value) {
   for (const key of ["autoName", "timelineAuto", "timelineInject", "spoilersEnabled", "mobilePeek"])
     if (v[key] !== undefined && typeof v[key] !== "boolean")
       throw new Error("Invalid toggle.");
+  if (v.widgetStyle !== undefined && !["auto", "peeking", "floating"].includes(String(v.widgetStyle)))
+    throw new Error("Unknown widget style.");
   if (!["random", "forum", "thread", "wiki"].includes(String(v.format)))
     throw new Error("Unknown gallery format.");
-  return { connectionId: v.connectionId, maxOutputTokens: integer(v.maxOutputTokens ?? 8192, 256, 32768), chatMaxWords: integer(v.chatMaxWords ?? 80, 0, 2000), slop: [...new Set(v.slop.map((x) => string(x, "Phrase", 200).trim()))], wholeWords: v.wholeWords, galleryEnabled: v.galleryEnabled, commentaryEnabled: v.commentaryEnabled === true, commentaryDuration: v.commentaryDuration === 0 ? 0 : integer(v.commentaryDuration ?? 14, 3, 120), commentaryWidth: integer(v.commentaryWidth ?? 280, 200, 400), commentaryInterval: integer(v.commentaryInterval ?? 1, 1, 50), mobilePeek: v.mobilePeek !== false, interval: integer(v.interval, 1, 100), format: v.format, contextMessages: integer(v.contextMessages, 5, 100), mascotSize: integer(v.mascotSize, 70, 180), autoName: v.autoName === true, nameInterval: integer(v.nameInterval ?? 20, 10, 50), timelineAuto: v.timelineAuto === true, timelineInject: v.timelineInject === true, spoilersEnabled: v.spoilersEnabled === true };
+  return { connectionId: v.connectionId, maxOutputTokens: integer(v.maxOutputTokens ?? 8192, 256, 32768), chatMaxWords: integer(v.chatMaxWords ?? 80, 0, 2000), slop: [...new Set(v.slop.map((x) => string(x, "Phrase", 200).trim()))], wholeWords: v.wholeWords, galleryEnabled: v.galleryEnabled, commentaryEnabled: v.commentaryEnabled === true, commentaryDuration: v.commentaryDuration === 0 ? 0 : integer(v.commentaryDuration ?? 14, 3, 120), commentaryWidth: integer(v.commentaryWidth ?? 280, 200, 400), commentaryInterval: integer(v.commentaryInterval ?? 1, 1, 50), mobilePeek: v.mobilePeek !== false, widgetStyle: v.widgetStyle ?? (v.mobilePeek === false ? "floating" : "auto"), interval: integer(v.interval, 1, 100), format: v.format, contextMessages: integer(v.contextMessages, 5, 100), mascotSize: integer(v.mascotSize, 70, 180), autoName: v.autoName === true, nameInterval: integer(v.nameInterval ?? 20, 10, 50), timelineAuto: v.timelineAuto === true, timelineInject: v.timelineInject === true, spoilersEnabled: v.spoilersEnabled === true };
 }
 function parseJSON(text) {
   const cleaned = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
@@ -160,7 +162,7 @@ function sameMessage(m, content, swipe) {
 // src/story.ts
 function migrate(state) {
   migrateConversations(state);
-  state.settings = { ...DEFAULTS, ...state.settings };
+  state.settings = { ...DEFAULTS, ...state.settings, widgetStyle: state.settings.widgetStyle ?? (state.settings.mobilePeek === false ? "floating" : "auto") };
   state.commented ??= [];
   state.commentaryCount ??= 0;
   state.story = { ...emptyStory(), ...state.story };

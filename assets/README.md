@@ -7,7 +7,7 @@ The nine PNGs were supplied by the project owner as KazzWare's mascot references
 - `kazz-listening.png`: “Chibi gótico con cola escorpión mecánica.png”, leaning over the chat input.
 - `kazz-wink.png`: “Elfo chibi y cola mecánica.png”, the quiet Gallery.
 - `kazz-cover.png`: “Alerta viral ciber gótica KazzWare.png”, the input-bar extension icon and visual reference for the silver/red palette.
-- `kazz-peek.png`: “Chibi demon mecánico asomándose.png”, the mobile edge launcher. CSS mirrors it at the left edge; the source image is unchanged.
+- `kazz-peek.png`: “Chibi demon mecánico asomándose.png”, the peeking edge launcher on any device. CSS fits the full original square image and mirrors only its artwork at the left edge; the source image is unchanged.
 - `kazz-idle.png`, `kazz-active.png`, `kazz-working.png`: original poses retained in source; not embedded in the current frontend.
 
 The owner’s two hand-drawn layouts inform the floating composition. Those reference drawings are not shipped.

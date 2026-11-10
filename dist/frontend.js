@@ -45,7 +45,7 @@ function typingBubble(ctx, anchor, options) {
 
 // src/shared.ts
 var CHANNEL = "kazzware.v1";
-var DEFAULTS = { connectionId: "", maxOutputTokens: 8192, chatMaxWords: 80, slop: ["a shiver ran down", "a testament to", "couldn’t help but", "could not help but", "orbs"], wholeWords: true, galleryEnabled: false, commentaryEnabled: false, commentaryDuration: 14, commentaryWidth: 280, commentaryInterval: 1, mobilePeek: true, interval: 5, format: "random", contextMessages: 30, mascotSize: 110, autoName: false, nameInterval: 20, timelineAuto: false, timelineInject: false, spoilersEnabled: false };
+var DEFAULTS = { connectionId: "", maxOutputTokens: 8192, chatMaxWords: 80, slop: ["a shiver ran down", "a testament to", "couldn’t help but", "could not help but", "orbs"], wholeWords: true, galleryEnabled: false, commentaryEnabled: false, commentaryDuration: 14, commentaryWidth: 280, commentaryInterval: 1, mobilePeek: true, widgetStyle: "auto", interval: 5, format: "random", contextMessages: 30, mascotSize: 110, autoName: false, nameInterval: 20, timelineAuto: false, timelineInject: false, spoilersEnabled: false };
 function object(value) {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new Error("Expected an object.");
@@ -243,29 +243,35 @@ var kazz_peek_default = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABOYAAATmC
 
 // src/mascot-layout.ts
 function mascotLayout(widget, button, image, settings) {
-  let peeking, side = "right", mobileY = Math.max(8, window.innerHeight - 190);
+  let peeking, side = "right", peekY = Math.max(8, window.innerHeight - 190), size = 110;
   let roundPosition = widget.getPosition();
   const height = () => window.visualViewport?.height || window.innerHeight;
   function dock() {
-    widget.moveTo(side === "left" ? 8 : window.innerWidth - 72, Math.max(8, Math.min(mobileY, height() - 92)));
+    widget.moveTo(side === "left" ? 8 : Math.max(8, window.innerWidth - size - 8), Math.max(8, Math.min(peekY, height() - size - 8)));
     button.classList.toggle("peek-left", side === "left");
   }
   function sync(resized = false) {
-    const next = window.innerWidth <= 600 && settings()?.mobilePeek !== false;
-    if (next !== peeking) {
+    const preferences = settings();
+    const style = preferences?.widgetStyle ?? (preferences?.mobilePeek === false ? "floating" : "auto");
+    const next = style === "peeking" || style === "auto" && window.innerWidth <= 600;
+    const changed = next !== peeking;
+    if (changed) {
       if (next)
         roundPosition = widget.getPosition();
       peeking = next;
       button.classList.toggle("peek", next);
       image.src = next ? kazz_peek_default : kazz_curled_default;
-      if (!next) {
+      if (!next)
         button.classList.remove("peek-left");
-        widget.moveTo(roundPosition.x, roundPosition.y);
-      }
       resized = true;
     }
-    const size = settings()?.mascotSize || 110;
-    widget.setSize(next ? 64 : size, next ? 84 : size);
+    const nextSize = preferences?.mascotSize || 110;
+    if (nextSize !== size)
+      resized = true;
+    size = nextSize;
+    widget.setSize(size, size);
+    if (changed && !next)
+      widget.moveTo(roundPosition.x, roundPosition.y);
     if (resized && next)
       dock();
     else if (resized) {
@@ -275,16 +281,16 @@ function mascotLayout(widget, button, image, settings) {
   }
   return { sync, reset() {
     side = "right";
-    mobileY = Math.max(8, height() - 190);
+    peekY = Math.max(8, height() - 190);
     const size = settings()?.mascotSize || 110;
     roundPosition = { x: Math.max(8, window.innerWidth - size - 24), y: Math.max(8, height() - size - 130) };
     widget.moveTo(roundPosition.x, roundPosition.y);
     sync(true);
-  }, width: () => peeking ? 64 : settings()?.mascotSize || 110, settled() {
+  }, width: () => size, settled() {
     const p = widget.getPosition();
     if (peeking) {
-      side = p.x + 32 < window.innerWidth / 2 ? "left" : "right";
-      mobileY = p.y;
+      side = p.x + size / 2 < window.innerWidth / 2 ? "left" : "right";
+      peekY = p.y;
       dock();
     } else
       roundPosition = p;
@@ -562,7 +568,7 @@ nav{display:flex;gap:8px;padding:2px 6px 9px;flex-shrink:0}nav button{pointer-ev
 .shard{position:absolute;z-index:2;overflow:hidden;display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;width:31%;padding:9px 8px;background:#17191dd9;background-image:linear-gradient(135deg,#ffffff12,transparent 55%,#ffffff05);isolation:isolate;color:var(--paper);border:1px solid #b1b5bc;border-radius:12px 22px 12px 8px;box-shadow:0 4px 14px #0008;pointer-events:auto;font-size:14px;line-height:1.2;white-space:nowrap}.shard:before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;clip-path:inset(0 round 12px);backdrop-filter:blur(12px) saturate(.3);-webkit-backdrop-filter:blur(12px) saturate(.3);pointer-events:none}.shard svg{width:22px;height:22px;flex-shrink:0}.shard span{font-weight:700}.shard:hover:enabled{translate:0 -2px;background:#33151fdf;color:var(--paper);border-color:var(--glow);box-shadow:0 0 19px #ff3b5850,inset 0 0 18px #ff3b581c}.shard:active:enabled{translate:0 0;box-shadow:0 0 28px #ff3b5880,inset 0 0 20px #ff3b5830}.shard-edit{left:0;top:4px;background:#eceef0df;color:var(--ink);transform:rotate(-4deg)}.shard-swipes{right:0;top:12px;transform:rotate(3deg);border-radius:24px 12px 12px 24px}.shard-slop{left:0;top:88px;width:26%;height:62px;flex-direction:column;gap:3px;border-radius:12px 12px 24px 12px}.shard-chat{right:0;top:92px;width:25%;height:62px;flex-direction:column;gap:3px;border-radius:50px;background:#eceef0df;color:var(--ink)}.shard-gallery{left:0;top:172px;width:28%;transform:rotate(2deg);flex-direction:column;gap:3px}.shard-timeline{right:0;top:181px;width:29%;height:61px;flex-direction:column;gap:3px;border-radius:12px 12px 26px 12px}.shard-notebook{left:0;top:258px;width:30%;height:57px;flex-direction:column;gap:2px;transform:rotate(-3deg)}.shard-naming{right:0;top:265px;width:30%;height:57px;flex-direction:column;gap:2px;transform:rotate(3deg)}.shard-commentary{left:33%;top:278px;width:34%;height:52px;flex-direction:column;gap:2px;border-radius:24px 24px 12px 12px;background:#eceef0df;color:var(--ink);font-size:13px}.shard-commentary svg{width:20px;height:20px}.feature-light{position:absolute;top:7px;right:7px;width:6px;height:6px;border:1px solid currentColor;border-radius:50%;opacity:.55}.feature-light.on{opacity:1;background:var(--glow);border-color:var(--glow);box-shadow:0 0 6px #ff3b5850}.plug{display:block;margin:10px auto 0;pointer-events:auto;background:var(--paper);color:var(--ink)}
 .workbench{pointer-events:auto;padding:20px 17px;margin:0 0 4px;background:#17191df2;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid #686c74;box-shadow:0 8px 24px #0005,inset 0 1px 0 #ffffff16;border-radius:12px 24px 12px 12px}.section-head{margin:0 0 18px;padding-bottom:12px;border-bottom:1px solid #53575f}.section-head .eyebrow,.section-head .badge{display:none}.workbench>.muted{font-size:13px;margin-bottom:16px}.note{padding:12px;background:#292c32;border-left:2px solid #b9bdc5;font-size:12px;color:#d1d4da;margin:17px 0;border-radius:6px}.range{font-size:12px;margin:10px 0;color:var(--paper)}.hits{white-space:pre-wrap;font-size:13px}.target-tools{margin:12px 0 18px}.target-readout{display:flex;gap:10px;align-items:center;padding:6px 0;font-size:12px}.target-readout>span:last-child{margin-left:auto;color:#b9bdc5;font:9px var(--mono)}.target-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.target-tools button{font-size:12px;padding:8px 9px}.follow-target[aria-pressed=true]{border-color:var(--paper)}.history{border:1px solid #53575f;border-radius:10px;padding:13px;margin:14px 0;background:#23262c}.history p{font-size:12px;color:#b9bdc5}.history button{font-size:12px;margin-top:10px}.history summary{cursor:pointer;font-size:13px;overflow-wrap:anywhere}.summary{white-space:pre-wrap;font-size:13px;margin-top:12px}.empty{font-size:13px;color:#b9bdc5;padding:16px 12px;border:1px dashed #646870;border-radius:10px;margin:16px 0}
 .phone{margin:22px auto 8px;background:#101114;padding:10px;border:2px solid #92969e;border-radius:28px;max-width:350px}.island{width:60px;height:13px;border-radius:12px;background:#44474e;margin:0 auto 10px}.phone-label{display:flex;justify-content:space-between;font:8px var(--mono);padding:0 5px 10px;color:#c6cad0}.screen{height:440px;overflow:hidden;background:#17191d;border-radius:12px}.screen iframe{width:100%;height:100%;border:0}.phone-bottom{height:4px;width:80px;background:#b9bdc5;border-radius:5px;margin:10px auto 0}.gallery-empty{display:grid;text-align:center;padding:20px 0;gap:12px}.off-duty{height:150px;max-width:90%;object-fit:contain;justify-self:center}.badge{display:inline-block;font:10px var(--mono);padding:3px 6px;background:#393d45;border-radius:5px}
-.mascot{position:relative;display:block;pointer-events:auto;width:100%;height:100%;padding:0;min-height:0;border:0;background:transparent;touch-action:none;user-select:none;overflow:visible;cursor:grab}.mascot:hover:enabled,.mascot:active:enabled{background:transparent;border:0;box-shadow:none;animation:none}.mascot img{width:100%;height:100%;object-fit:contain;pointer-events:none;user-select:none;-webkit-user-drag:none;filter:drop-shadow(0 5px 7px #0008)}.mascot .dot{position:absolute;right:9%;bottom:12%;height:7px;width:7px;background:var(--paper);border:1px solid var(--ink);border-radius:50%}.mascot.busy .dot{animation:pulse 1.3s ease-in-out infinite}.mascot.peek{overflow:hidden;border-radius:0;translate:8px 0}.mascot.peek img{position:absolute;right:0;bottom:0;width:96px;max-width:none;height:96px;object-fit:contain}.mascot.peek .dot{right:4px;bottom:5px}.mascot.peek.peek-left{translate:-8px 0;transform:scaleX(-1)}[data-dragging]{cursor:grabbing!important}@keyframes contact{from{filter:brightness(1.12)}to{filter:brightness(1)}}@keyframes pulse{50%{opacity:.35}}
+.mascot{position:relative;display:block;pointer-events:auto;width:100%;height:100%;padding:0;min-height:0;border:0;background:transparent;touch-action:none;user-select:none;overflow:visible;cursor:grab}.mascot:hover:enabled,.mascot:active:enabled{background:transparent;border:0;box-shadow:none;animation:none}.mascot img{display:block;width:100%;height:100%;object-fit:contain;image-rendering:auto;pointer-events:none;user-select:none;-webkit-user-drag:none;filter:drop-shadow(0 5px 7px #0008)}.mascot .dot{position:absolute;right:9%;bottom:12%;height:7px;width:7px;background:var(--paper);border:1px solid var(--ink);border-radius:50%}.mascot.busy .dot{animation:pulse 1.3s ease-in-out infinite}.mascot.peek{overflow:visible;border-radius:0}.mascot.peek img{position:absolute;inset:0;width:100%;max-width:none;height:100%;object-fit:contain}.mascot.peek .dot{right:4px;bottom:5px}.mascot.peek.peek-left img{transform:scaleX(-1)}.mascot.peek.peek-left .dot{left:4px;right:auto}[data-dragging]{cursor:grabbing!important}@keyframes contact{from{filter:brightness(1.12)}to{filter:brightness(1)}}@keyframes pulse{50%{opacity:.35}}
 @container kazz (max-width:340px){.shard{font-size:12px;gap:4px}.shard svg{width:19px;height:19px}.shard-commentary{font-size:11px}.orbit-kazz{left:9%;width:82%}.workbench{padding:17px 12px}.brand{font-size:21px}.top{gap:6px}.title{max-width:calc(100% - 100px)}}
 @media(max-width:600px){input,textarea,select{font-size:16px}.body{padding:4px}.top{padding-top:max(4px,env(safe-area-inset-top))}.status{margin-bottom:max(6px,env(safe-area-inset-bottom))}}
 @media(max-height:470px){[data-screen=home] .body{overflow:auto}}
@@ -2216,8 +2222,12 @@ function setup(ctx) {
   }
   function renderSettings() {
     const s = settingsDraft || view.state.settings;
-    body.innerHTML = `${heading("06 / SETTINGS", "Settings", "HANDLE WITH CARE")}<p class="muted">Saved separately for each chat.</p><label class="field">Kazz’s connection<select class="connection"><option value="">Choose a connection…</option>${view.connections.map((c) => `<option value="${escapeHTML(c.id)}" ${c.id === s.connectionId ? "selected" : ""}>${escapeHTML(c.name)} · ${escapeHTML(c.model)}</option>`).join("")}</select></label><small>Uses this saved connection for every Kazz request. Your roleplay connection stays as it is.</small><label class="field">Max words in Kazz’s Chat replies<input class="chat-max-words" type="number" min="0" max="2000" step="1" value="${s.chatMaxWords}"></label><small>0 = no word cap · up to 2,000 words. Also adjustable beside Send in Chat. Only Kazz’s own dialogue is shortened; edits, summaries and lorebooks keep their task lengths.</small><label class="field">Kazz’s output cutoff (tokens)<input class="max-output-tokens" type="number" min="256" max="32768" step="1" value="${s.maxOutputTokens}"></label><small>256–32,768 output tokens per model call, including reasoning and JSON. This is separate from reply word count; your connection may allow less. Applies to Chat and caps other Kazz tasks. Cut-off or incomplete replies are not saved; completed tool changes remain.</small><label class="field">Recent messages in working context (5–100)<input class="context" type="number" min="5" max="100" value="${s.contextMessages}"></label><label class="field">Gallery interval (normal replies)<input class="interval" type="number" min="1" max="100" value="${s.interval}"></label><label class="field">Gallery format<select class="format">${[["random", "Surprise me"], ["forum", "AITA / discussion forum"], ["thread", "Fandom social thread"], ["wiki", "Unofficial wiki"]].map(([key, label]) => `<option value="${key}" ${key === s.format ? "selected" : ""}>${label}</option>`).join("")}</select></label><label class="field">Mascot size<input class="size" type="range" min="70" max="180" value="${s.mascotSize}"></label><label class="check"><span>Use the mobile peeker</span><input class="mobile-peek" type="checkbox" role="switch" ${s.mobilePeek ? "checked" : ""}></label><div class="row"><button class="primary save-settings" data-mutate>Save settings</button><button class="reload-state">Reload</button><button class="recover-widget">Reset widget position</button></div><div class="note">Context goes to the connection you select. Search can inspect older messages; summaries read the whole chat. Kazz never receives connection API keys.</div>`;
-    const read = () => ({ ...view.state.settings, chatMaxWords: Number(body.querySelector(".chat-max-words").value), maxOutputTokens: Number(body.querySelector(".max-output-tokens").value), mobilePeek: body.querySelector(".mobile-peek").checked, connectionId: body.querySelector(".connection").value, contextMessages: Number(body.querySelector(".context").value), interval: Number(body.querySelector(".interval").value), format: body.querySelector(".format").value, mascotSize: Number(body.querySelector(".size").value) });
+    body.innerHTML = `${heading("06 / SETTINGS", "Settings", "HANDLE WITH CARE")}<p class="muted">Saved separately for each chat.</p><label class="field">Kazz’s connection<select class="connection"><option value="">Choose a connection…</option>${view.connections.map((c) => `<option value="${escapeHTML(c.id)}" ${c.id === s.connectionId ? "selected" : ""}>${escapeHTML(c.name)} · ${escapeHTML(c.model)}</option>`).join("")}</select></label><small>Uses this saved connection for every Kazz request. Your roleplay connection stays as it is.</small><label class="field">Max words in Kazz’s Chat replies<input class="chat-max-words" type="number" min="0" max="2000" step="1" value="${s.chatMaxWords}"></label><small>0 = no word cap · up to 2,000 words. Also adjustable beside Send in Chat. Only Kazz’s own dialogue is shortened; edits, summaries and lorebooks keep their task lengths.</small><label class="field">Kazz’s output cutoff (tokens)<input class="max-output-tokens" type="number" min="256" max="32768" step="1" value="${s.maxOutputTokens}"></label><small>256–32,768 output tokens per model call, including reasoning and JSON. This is separate from reply word count; your connection may allow less. Applies to Chat and caps other Kazz tasks. Cut-off or incomplete replies are not saved; completed tool changes remain.</small><label class="field">Recent messages in working context (5–100)<input class="context" type="number" min="5" max="100" value="${s.contextMessages}"></label><label class="field">Gallery interval (normal replies)<input class="interval" type="number" min="1" max="100" value="${s.interval}"></label><label class="field">Gallery format<select class="format">${[["random", "Surprise me"], ["forum", "AITA / discussion forum"], ["thread", "Fandom social thread"], ["wiki", "Unofficial wiki"]].map(([key, label]) => `<option value="${key}" ${key === s.format ? "selected" : ""}>${label}</option>`).join("")}</select></label><label class="field">Mascot size<input class="size" type="range" min="70" max="180" value="${s.mascotSize}"></label><fieldset class="widget-style-field"><legend>Widget style</legend><div class="segments widget-styles" aria-label="Widget style">${[["auto", "Auto"], ["peeking", "Peeking"], ["floating", "Floating"]].map(([key, label]) => `<button type="button" data-widget-style="${key}" aria-pressed="${s.widgetStyle === key}">${label}</button>`).join("")}</div><small>Auto peeks on small screens. Choose either pose on any device; the size slider applies to both. Drag the peeker to either edge.</small></fieldset><div class="row"><button class="primary save-settings" data-mutate>Save settings</button><button class="reload-state">Reload</button><button class="recover-widget">Reset widget position</button></div><div class="note">Context goes to the connection you select. Search can inspect older messages; summaries read the whole chat. Kazz never receives connection API keys.</div>`;
+    const read = () => ({ ...view.state.settings, chatMaxWords: Number(body.querySelector(".chat-max-words").value), maxOutputTokens: Number(body.querySelector(".max-output-tokens").value), widgetStyle: body.querySelector("[data-widget-style][aria-pressed=true]").dataset.widgetStyle, connectionId: body.querySelector(".connection").value, contextMessages: Number(body.querySelector(".context").value), interval: Number(body.querySelector(".interval").value), format: body.querySelector(".format").value, mascotSize: Number(body.querySelector(".size").value) });
+    body.querySelectorAll("[data-widget-style]").forEach((button) => button.addEventListener("click", () => {
+      body.querySelectorAll("[data-widget-style]").forEach((b) => b.setAttribute("aria-pressed", String(b === button)));
+      settingsDraft = read();
+    }));
     body.querySelectorAll("input,select").forEach((input) => input.addEventListener("input", () => {
       settingsDraft = read();
     }));
