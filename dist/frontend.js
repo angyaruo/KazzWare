@@ -1,3 +1,73 @@
+// src/shared.ts
+var CHANNEL = "kazzware.v1";
+var DEFAULTS = { connectionId: "", maxOutputTokens: 8192, chatMaxWords: 80, slop: ["a shiver ran down", "a testament to", "couldn’t help but", "could not help but", "orbs"], wholeWords: true, galleryEnabled: false, commentaryEnabled: false, commentaryDuration: 14, commentaryWidth: 280, commentaryInterval: 1, mobilePeek: true, widgetStyle: "auto", interval: 5, format: "random", contextMessages: 30, mascotSize: 110, autoName: false, nameInterval: 20, timelineAuto: false, timelineInject: false, spoilersEnabled: false };
+function object(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new Error("Expected an object.");
+  return value;
+}
+function uniqueRange(source, selected) {
+  if (!selected)
+    return;
+  const start = source.indexOf(selected);
+  if (start < 0 || source.indexOf(selected, start + 1) >= 0)
+    return;
+  return { start, end: start + selected.length };
+}
+function slopHits(text, phrases, wholeWords) {
+  return phrases.map((phrase) => {
+    const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = wholeWords ? `(?<![\\p{L}\\p{N}_])${escaped}(?![\\p{L}\\p{N}_])` : escaped;
+    return { phrase, count: Array.from(text.matchAll(new RegExp(pattern, "giu"))).length };
+  }).filter((x) => x.count > 0);
+}
+function escapeHTML(text) {
+  return text.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+}
+
+// src/identity.ts
+var UUID_COMPATIBILITY = "KazzWare requires a Lumiverse build with the Spindle UUID helper (uuid-v1; Lumiverse 1.3.0 or newer). Update Lumiverse before using this KazzWare version.";
+var UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+var setupSequence = 0;
+function frontendIdentity(ctx) {
+  if (!ctx.frontendSessionId)
+    return Promise.reject(new Error(UUID_COMPATIBILITY));
+  const nonce = `${ctx.frontendSessionId}:${Date.now()}:${performance.now()}:${++setupSequence}`;
+  return new Promise((resolve, reject) => {
+    let off = () => {};
+    const timer = setTimeout(() => {
+      off();
+      reject(new Error("KazzWare could not obtain a Lumiverse UUID. Restart KazzWare and check that Lumiverse supports uuid-v1."));
+    }, 15000);
+    try {
+      off = ctx.onBackendMessage((payload) => {
+        let reply;
+        try {
+          reply = object(payload);
+        } catch {
+          return;
+        }
+        if (reply.channel !== CHANNEL || reply.action !== "identity" || reply.nonce !== nonce)
+          return;
+        clearTimeout(timer);
+        off();
+        if (typeof reply.error === "string")
+          reject(new Error(reply.error));
+        else if (typeof reply.client === "string" && UUID_V4.test(reply.client))
+          resolve(reply.client);
+        else
+          reject(new Error("Lumiverse returned an invalid KazzWare identity."));
+      });
+      ctx.ready();
+      ctx.sendToBackend({ channel: CHANNEL, action: "identity", nonce });
+    } catch (error) {
+      clearTimeout(timer);
+      off();
+      reject(error);
+    }
+  });
+}
+
 // src/typing-bubble.ts
 function typingBubble(ctx, anchor, options) {
   const portal = ctx.dom.createElement("div");
@@ -41,33 +111,6 @@ function typingBubble(ctx, anchor, options) {
       portal.remove();
     }
   };
-}
-
-// src/shared.ts
-var CHANNEL = "kazzware.v1";
-var DEFAULTS = { connectionId: "", maxOutputTokens: 8192, chatMaxWords: 80, slop: ["a shiver ran down", "a testament to", "couldn’t help but", "could not help but", "orbs"], wholeWords: true, galleryEnabled: false, commentaryEnabled: false, commentaryDuration: 14, commentaryWidth: 280, commentaryInterval: 1, mobilePeek: true, widgetStyle: "auto", interval: 5, format: "random", contextMessages: 30, mascotSize: 110, autoName: false, nameInterval: 20, timelineAuto: false, timelineInject: false, spoilersEnabled: false };
-function object(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value))
-    throw new Error("Expected an object.");
-  return value;
-}
-function uniqueRange(source, selected) {
-  if (!selected)
-    return;
-  const start = source.indexOf(selected);
-  if (start < 0 || source.indexOf(selected, start + 1) >= 0)
-    return;
-  return { start, end: start + selected.length };
-}
-function slopHits(text, phrases, wholeWords) {
-  return phrases.map((phrase) => {
-    const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const pattern = wholeWords ? `(?<![\\p{L}\\p{N}_])${escaped}(?![\\p{L}\\p{N}_])` : escaped;
-    return { phrase, count: Array.from(text.matchAll(new RegExp(pattern, "giu"))).length };
-  }).filter((x) => x.count > 0);
-}
-function escapeHTML(text) {
-  return text.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 }
 
 // src/chat-ui.ts
@@ -1344,14 +1387,14 @@ function inlineGallery(dom, load, react) {
 
 // src/frontend.ts
 var TABS = [["home", "← Home"], ["edit", "Editor"], ["slop", "De-slop"], ["chat", "Chat"], ["gallery", "Gallery"], ["notebook", "Notebook"], ["timeline", "Summary+"], ["swipes", "Swipes"], ["commentary", "Commentary"], ["naming", "Chat naming"], ["settings", "Settings"]];
-function randomId() {
-  return Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-function setup(ctx) {
+async function setup(ctx) {
   const stateAPI = ctx.state;
   if (!stateAPI)
-    throw new Error("KazzWare requires the Lumiverse 1.2.5 frontend state API. Update Lumiverse and reload.");
+    throw new Error("KazzWare requires the Lumiverse 1.3.0 frontend state API. Update Lumiverse and reload.");
   ctx.deferReady();
+  const client = await frontendIdentity(ctx);
+  let sequence = 0;
+  const nextId = () => `${client}:${++sequence}`;
   const disposers = [];
   const fontStyle = document.createElement("style");
   fontStyle.dataset.kazzwareFont = "";
@@ -1364,8 +1407,7 @@ function setup(ctx) {
   `;
   document.head.append(fontStyle);
   disposers.push(() => fontStyle.remove());
-  const client = randomId();
-  let binding = randomId();
+  let binding = nextId();
   let chatId = null;
   let destroyed = false;
   let opened = false;
@@ -1457,7 +1499,7 @@ function setup(ctx) {
   function rpc(action, data = {}, stream) {
     if (destroyed)
       return Promise.reject(new Error("KazzWare closed."));
-    const id = randomId();
+    const id = nextId();
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         pending.delete(id);
@@ -1913,7 +1955,7 @@ function setup(ctx) {
     following = true;
     invalidateSelection();
     clearTimeout(followTimer);
-    binding = randomId();
+    binding = nextId();
     chatId = next;
     view = undefined;
     target = undefined;

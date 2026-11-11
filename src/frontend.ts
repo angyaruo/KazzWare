@@ -1,3 +1,4 @@
+import { frontendIdentity } from './identity';
 import { typingBubble } from './typing-bubble';
 import { mountChat, paintChatStream, CHAT_CSS, type ChatStream } from './chat-ui';
 import type { SpindleFrontendContext, SpindleSandboxFrameHandle } from 'lumiverse-spindle-types';
@@ -23,15 +24,13 @@ import { inlineGallery } from './inline-gallery';
 
 type Tab = 'home' | 'edit' | 'slop' | 'chat' | 'gallery' | 'notebook' | 'settings' | 'timeline' | 'swipes' | 'commentary' | 'naming';
 const TABS: [Tab, string][] = [['home', '← Home'], ['edit', 'Editor'], ['slop', 'De-slop'], ['chat', 'Chat'], ['gallery', 'Gallery'], ['notebook', 'Notebook'], ['timeline', 'Summary+'], ['swipes', 'Swipes'], ['commentary', 'Commentary'], ['naming', 'Chat naming'], ['settings', 'Settings']];
-function randomId(): string {
-  // These are opaque correlation IDs. getRandomValues also works on LAN HTTP,
-  // where browsers do not expose the secure-context-only crypto.randomUUID.
-  return Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('');
-}
-export function setup(ctx: SpindleFrontendContext): () => void {
+export async function setup(ctx: SpindleFrontendContext): Promise<() => void> {
   const stateAPI = ctx.state;
-  if (!stateAPI) throw new Error('KazzWare requires the Lumiverse 1.2.5 frontend state API. Update Lumiverse and reload.');
+  if (!stateAPI) throw new Error('KazzWare requires the Lumiverse 1.3.0 frontend state API. Update Lumiverse and reload.');
   ctx.deferReady();
+  const client = await frontendIdentity(ctx);
+  let sequence = 0;
+  const nextId = () => `${client}:${++sequence}`;
   const disposers: (() => void)[] = [];
   // Font faces live in the document so they resolve inside both shadow roots.
   const fontStyle = document.createElement('style'); fontStyle.dataset.kazzwareFont = ''; fontStyle.textContent = FONT_CSS + `
@@ -42,7 +41,7 @@ export function setup(ctx: SpindleFrontendContext): () => void {
     [data-kazzware-candidate] { outline:3px solid #eceef0!important; outline-offset:-3px; cursor:crosshair!important }
   `;
   document.head.append(fontStyle); disposers.push(() => fontStyle.remove());
-  const client = randomId(); let binding = randomId(); let chatId: string | null = null;
+  let binding = nextId(); let chatId: string | null = null;
   let destroyed = false; let opened = false; let tab: Tab = 'home'; let view: View | undefined;
   let target: Message | undefined; let range: Range | undefined; let selectionRequest = 0;
   let following = true; let picking = false; let followTimer: ReturnType<typeof setTimeout> | undefined; let autoPending = ''; let autoToken = 0;
@@ -88,7 +87,7 @@ export function setup(ctx: SpindleFrontendContext): () => void {
   }
   function rpc<T = unknown>(action: string, data: Record<string, unknown> = {}, stream?: (stream: NonNullable<Reply['stream']>) => void): Promise<T> {
     if (destroyed) return Promise.reject(new Error('KazzWare closed.'));
-    const id = randomId();
+    const id = nextId();
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => { pending.delete(id); reject(new Error('Kazz did not receive a response. Reload to check completed changes.')); }, 610_000);
       pending.set(id, { resolve: result => resolve(result as T), reject, timer, stream });
@@ -295,7 +294,7 @@ export function setup(ctx: SpindleFrontendContext): () => void {
     prompt.reset(); chatter.reset(); inline.clear(); petDrag.cancel(); panelDrag.cancel();
     for (const item of pending.values()) { clearTimeout(item.timer); item.reject(new Error('Chat changed.')); } pending.clear();
     stopPicking(); following = true; invalidateSelection(); clearTimeout(followTimer);
-    binding = randomId(); chatId = next; view = undefined; target = undefined; range = undefined; direction = ''; askDraft = ''; chatStream = undefined; slopDraft = undefined; settingsDraft = undefined; pageId = ''; timelineShown = 30; commentaryDraft = {}; namingDraft = {}; busy = 0;
+    binding = nextId(); chatId = next; view = undefined; target = undefined; range = undefined; direction = ''; askDraft = ''; chatStream = undefined; slopDraft = undefined; settingsDraft = undefined; pageId = ''; timelineShown = 30; commentaryDraft = {}; namingDraft = {}; busy = 0;
     frame?.destroy(); frame = undefined; mascot.setVisible(!!chatId); panel.setVisible(!!chatId && opened); inputAction.setEnabled(!!chatId);
     render();
     if (chatId) void run('bind', {}, 'Kazz is here. Pick a message or ask a favor.'); else { void rpc('bind').catch(() => {}); notify('Open a chat to wake Kazz.'); }

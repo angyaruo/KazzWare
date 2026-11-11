@@ -1,3 +1,4 @@
+import { hostUUID } from './identity';
 import { migrateConversations } from './conversations';
 import type { SpindleAPI, InterceptorContextDTO, LlmMessageDTO, InterceptorResultDTO } from 'lumiverse-spindle-types';
 import { DEFAULTS, emptyState, integer, object, parseJSON, string, type Message, type State } from './shared';
@@ -56,7 +57,7 @@ export class StoryFeatures {
     const merged = string(result.replacement, 'Merged swipe', 100_000);
     if ((await this.swipes(job, before.messageId)).revision !== before.revision) throw new Error('The swipes changed while merging. Nothing was applied.');
     const swipes = [...before.swipes, merged], dates = [...before.dates, Math.floor(Date.now() / 1000)], active = swipes.length - 1;
-    const record = { id: crypto.randomUUID(), messageId: before.messageId, before, after: await fingerprint([swipes, dates, active]), createdAt: Date.now(), status: 'prepared' as 'prepared' | 'applied' | 'undone' };
+    const record = { id: await hostUUID(this.api), messageId: before.messageId, before, after: await fingerprint([swipes, dates, active]), createdAt: Date.now(), status: 'prepared' as 'prepared' | 'applied' | 'undone' };
     job.state.story.merges = [...job.state.story.merges.slice(-9), record]; await job.save(); job.live();
     if ((await this.swipes(job, before.messageId)).revision !== before.revision) throw new Error('Swipes changed before saving. Reload them.');
     await this.api.chat.updateMessage(job.chatId, before.messageId, { swipes, swipe_dates: dates, swipe_id: active });
@@ -78,7 +79,7 @@ export class StoryFeatures {
     const after = string(result.name, 'Chat name', 80).replace(/\s+/g, ' ').trim();
     if (before.name === after) return;
     job.live(); if ((await this.api.chats.get(job.chatId, job.user))?.name !== before.name) throw new Error('The chat was renamed while Kazz was working. Your title is preserved.');
-    const record = { id: crypto.randomUUID(), before: before.name, after, status: 'prepared' as 'prepared' | 'applied' | 'undone', createdAt: Date.now() };
+    const record = { id: await hostUUID(this.api), before: before.name, after, status: 'prepared' as 'prepared' | 'applied' | 'undone', createdAt: Date.now() };
     job.state.story.names = [...job.state.story.names.slice(-9), record]; await job.save(); job.live();
     if ((await this.api.chats.get(job.chatId, job.user))?.name !== before.name) throw new Error('The chat title changed before saving.');
     await this.api.chats.update(job.chatId, { name: after }, job.user);
@@ -99,7 +100,7 @@ export class StoryFeatures {
     const result = parseJSON(await job.model('Summarize ONLY the target message into at most two short sentences, no more than 300 characters total. Keep concrete continuity facts; never invent details. Extract in-story date, time, place and participants only if established; use empty strings for unknowns. Never infer a story date from computer time. Return JSON {"summary":"...","storyDate":"","storyTime":"","location":"","characters":""}. Context is for reference, not extra events to summarize.', { target: m, context: messages.slice(Math.max(0, messages.indexOf(m) - 3), messages.indexOf(m)).map(m => ({ name: m.name, content: m.content.slice(-3000) })) }, 512));
     const current = (await job.messages()).find(x => x.id === m.id);
     if (!current || await sourceHash(current) !== hash) throw new Error('This message or swipe changed during summarization.');
-    const entry: TimelineEntry = { id: previous?.id || crypto.randomUUID(), messageId: m.id, swipe: m.swipe_id, sourceHash: hash, summary: summaryText(result.summary), storyDate: short(result.storyDate, 80), storyTime: short(result.storyTime, 80), location: short(result.location, 120), characters: short(result.characters, 180), createdAt: previous?.createdAt || Date.now(), manual: false };
+    const entry: TimelineEntry = { id: previous?.id || await hostUUID(this.api), messageId: m.id, swipe: m.swipe_id, sourceHash: hash, summary: summaryText(result.summary), storyDate: short(result.storyDate, 80), storyTime: short(result.storyTime, 80), location: short(result.location, 120), characters: short(result.characters, 180), createdAt: previous?.createdAt || Date.now(), manual: false };
     await this.storeEntry(job, entry);
   }
   private async storeEntry(job: StoryJob, entry: TimelineEntry) {
@@ -122,7 +123,7 @@ export class StoryFeatures {
     const status = data.status ?? 'planned';
     if (!['planned', 'paused', 'fulfilled'].includes(String(status))) throw new Error('Invalid event status.');
     const afterMessages = data.afterMessages === null ? null : integer(data.afterMessages, 0, 1000);
-    const event: Spoiler = { id: existing?.id || crypto.randomUUID(), text: string(data.text, 'Future event', 2000), afterMessages, anchor: existing?.anchor ?? messages.at(-1)?.id ?? '', status: status as Spoiler['status'], reason: '', createdAt: existing?.createdAt || Date.now() };
+    const event: Spoiler = { id: existing?.id || await hostUUID(this.api), text: string(data.text, 'Future event', 2000), afterMessages, anchor: existing?.anchor ?? messages.at(-1)?.id ?? '', status: status as Spoiler['status'], reason: '', createdAt: existing?.createdAt || Date.now() };
     // Changing the delay starts its countdown again from the current end of the chat.
     if (existing && existing.afterMessages !== afterMessages) event.anchor = messages.at(-1)?.id || '';
     job.state.story.spoilers = [...job.state.story.spoilers.filter(e => e.id !== event.id), event]; job.state.story.planKey = ''; await job.save();

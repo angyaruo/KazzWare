@@ -74,7 +74,7 @@ Choose an interval of **1–50 new messages/swipes**, a small, medium or large b
 
 ## Install
 
-You need **Lumiverse 1.2.5 or newer** and a working model connection saved in Lumiverse.
+You need **Lumiverse 1.3.0 or newer with the Spindle UUID helper (`uuid-v1`)** and a working model connection saved in Lumiverse. This requirement starts with KazzWare 0.7.6. If your Lumiverse build does not expose that helper yet, keep KazzWare 0.7.5 until Lumiverse is updated; the UUID API is currently in Lumiverse staging.
 
 1. Open Lumiverse's extension manager and install from **GitHub**, using this repository and the `main` branch:
 

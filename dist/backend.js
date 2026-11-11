@@ -1,90 +1,4 @@
 // @bun
-// src/reply-length.ts
-var segmenter = new Intl.Segmenter(undefined, { granularity: "word" });
-function limitReply(text, maxWords) {
-  if (!maxWords)
-    return { text, limited: false };
-  let words = 0;
-  for (const segment of segmenter.segment(text)) {
-    if (!segment.isWordLike || ++words <= maxWords)
-      continue;
-    const prefix = text.slice(0, segment.index).trimEnd().replace(/[,:;\-\u2013\u2014]+$/u, "").trimEnd();
-    return { text: prefix.endsWith("\u2026") ? prefix : `${prefix}\u2026`, limited: true };
-  }
-  return { text, limited: false };
-}
-function replyLengthInstruction(maxWords) {
-  return `Write Kazz's own answer as a casual back-and-forth chat, not an essay. Prefer one to three short sentences and skip unnecessary recaps, headings and lists.${maxWords ? ` The user has set a strict maximum of ${maxWords} words for your answer text. Finish your thought within that limit, even if earlier replies were longer.` : " Match the detail the user asks for."} This preference applies only to your answer dialogue; tool arguments, message edits, summaries and lorebook content keep their own task requirements.`;
-}
-
-// src/answer-stream.ts
-function answerPreview(source) {
-  const prefix = /^\s*(?:```(?:json)?\s*)?\{\s*"action"\s*:\s*"answer"\s*,\s*"text"\s*:\s*"/i.exec(source);
-  if (!prefix)
-    return;
-  let text = "";
-  for (let i = prefix[0].length;i < source.length && text.length < 20000; i++) {
-    const c = source[i];
-    if (c === '"')
-      break;
-    if (c.charCodeAt(0) < 32)
-      return;
-    if (c !== "\\") {
-      text += c;
-      continue;
-    }
-    const escape = source[i + 1];
-    if (!escape)
-      break;
-    const length = escape === "u" ? 6 : 2;
-    if (source.length - i < length)
-      break;
-    try {
-      text += JSON.parse(`"${source.slice(i, i + length)}"`);
-    } catch {
-      return;
-    }
-    i += length - 1;
-  }
-  return text.slice(0, 20000).replace(/[\uD800-\uDBFF]$/, "");
-}
-
-// src/conversations.ts
-var MAX_CONVERSATIONS = 50;
-function migrateConversations(state) {
-  state.conversation ??= { id: "initial", title: "Conversation with Kazz", createdAt: state.turns[0]?.at || Date.now(), updatedAt: state.turns.at(-1)?.at || Date.now() };
-  state.conversations ??= [];
-}
-function expectConversation(state, id) {
-  if (id !== undefined && id !== state.conversation.id)
-    throw new Error("The Kazz conversation changed. Reload before trying again.");
-}
-function archive(state) {
-  if (!state.turns.length)
-    return;
-  if (state.conversations.length >= MAX_CONVERSATIONS)
-    throw new Error("There are 50 saved conversations in this roleplay. Delete an old one in Manage chats first.");
-  state.conversations.push({ ...state.conversation, turns: state.turns });
-}
-function newConversation(state) {
-  archive(state);
-  state.conversation = { id: crypto.randomUUID(), title: "New conversation", createdAt: Date.now(), updatedAt: Date.now() };
-  state.turns = [];
-}
-function switchConversation(state, id) {
-  const saved = state.conversations.find((c) => c.id === id);
-  if (!saved)
-    throw new Error("That saved Kazz conversation is no longer available.");
-  state.conversations = state.conversations.filter((c) => c.id !== id);
-  archive(state);
-  const { turns, ...info } = saved;
-  state.conversation = info;
-  state.turns = turns;
-}
-function conversationInfo(info, turns) {
-  return { ...info, turnCount: turns.length };
-}
-
 // src/story-types.ts
 var emptyStory = () => ({ timeline: [], timelineVersions: [], spoilers: [], merges: [], names: [], nameSeen: [], nameCount: 0, nameAttempted: false, timelineSeen: [], planKey: "", planAnchor: "", planHash: "" });
 async function fingerprint(value) {
@@ -159,6 +73,132 @@ function sameMessage(m, content, swipe) {
   return !!m && m.content === content && m.swipe_id === swipe;
 }
 
+// src/identity.ts
+var UUID_COMPATIBILITY = "KazzWare requires a Lumiverse build with the Spindle UUID helper (uuid-v1; Lumiverse 1.3.0 or newer). Update Lumiverse before using this KazzWare version.";
+var UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+function requireUUID(api) {
+  if ((api.host?.capabilities?.["uuid-v1"] ?? 0) < 1 || typeof api.uuid?.v4 !== "function")
+    throw new Error(UUID_COMPATIBILITY);
+}
+async function hostUUID(api) {
+  requireUUID(api);
+  const id = await api.uuid.v4();
+  if (!UUID_V4.test(id))
+    throw new Error("Lumiverse returned an invalid UUID. Nothing was saved.");
+  return id;
+}
+async function identityRequest(api, payload, user, session) {
+  let value;
+  try {
+    value = object(payload);
+  } catch {
+    return false;
+  }
+  if (value.channel !== CHANNEL || value.action !== "identity")
+    return false;
+  if (!user || !session)
+    return true;
+  let nonce;
+  try {
+    nonce = string(value.nonce, "Identity nonce", 160);
+  } catch {
+    return true;
+  }
+  const base = { channel: CHANNEL, action: "identity", nonce };
+  try {
+    api.sendToFrontend({ ...base, client: await hostUUID(api) }, user, { frontendSessionId: session });
+  } catch (error) {
+    api.sendToFrontend({ ...base, error: error instanceof Error ? error.message : UUID_COMPATIBILITY }, user, { frontendSessionId: session });
+  }
+  return true;
+}
+
+// src/reply-length.ts
+var segmenter = new Intl.Segmenter(undefined, { granularity: "word" });
+function limitReply(text, maxWords) {
+  if (!maxWords)
+    return { text, limited: false };
+  let words = 0;
+  for (const segment of segmenter.segment(text)) {
+    if (!segment.isWordLike || ++words <= maxWords)
+      continue;
+    const prefix = text.slice(0, segment.index).trimEnd().replace(/[,:;\-\u2013\u2014]+$/u, "").trimEnd();
+    return { text: prefix.endsWith("\u2026") ? prefix : `${prefix}\u2026`, limited: true };
+  }
+  return { text, limited: false };
+}
+function replyLengthInstruction(maxWords) {
+  return `Write Kazz's own answer as a casual back-and-forth chat, not an essay. Prefer one to three short sentences and skip unnecessary recaps, headings and lists.${maxWords ? ` The user has set a strict maximum of ${maxWords} words for your answer text. Finish your thought within that limit, even if earlier replies were longer.` : " Match the detail the user asks for."} This preference applies only to your answer dialogue; tool arguments, message edits, summaries and lorebook content keep their own task requirements.`;
+}
+
+// src/answer-stream.ts
+function answerPreview(source) {
+  const prefix = /^\s*(?:```(?:json)?\s*)?\{\s*"action"\s*:\s*"answer"\s*,\s*"text"\s*:\s*"/i.exec(source);
+  if (!prefix)
+    return;
+  let text = "";
+  for (let i = prefix[0].length;i < source.length && text.length < 20000; i++) {
+    const c = source[i];
+    if (c === '"')
+      break;
+    if (c.charCodeAt(0) < 32)
+      return;
+    if (c !== "\\") {
+      text += c;
+      continue;
+    }
+    const escape = source[i + 1];
+    if (!escape)
+      break;
+    const length = escape === "u" ? 6 : 2;
+    if (source.length - i < length)
+      break;
+    try {
+      text += JSON.parse(`"${source.slice(i, i + length)}"`);
+    } catch {
+      return;
+    }
+    i += length - 1;
+  }
+  return text.slice(0, 20000).replace(/[\uD800-\uDBFF]$/, "");
+}
+
+// src/conversations.ts
+var MAX_CONVERSATIONS = 50;
+function migrateConversations(state) {
+  state.conversation ??= { id: "initial", title: "Conversation with Kazz", createdAt: state.turns[0]?.at || Date.now(), updatedAt: state.turns.at(-1)?.at || Date.now() };
+  state.conversations ??= [];
+}
+function expectConversation(state, id) {
+  if (id !== undefined && id !== state.conversation.id)
+    throw new Error("The Kazz conversation changed. Reload before trying again.");
+}
+function archive(state) {
+  if (!state.turns.length)
+    return;
+  if (state.conversations.length >= MAX_CONVERSATIONS)
+    throw new Error("There are 50 saved conversations in this roleplay. Delete an old one in Manage chats first.");
+  state.conversations.push({ ...state.conversation, turns: state.turns });
+}
+function newConversation(state, id) {
+  archive(state);
+  state.conversation = { id, title: "New conversation", createdAt: Date.now(), updatedAt: Date.now() };
+  state.turns = [];
+}
+function switchConversation(state, id) {
+  const saved = state.conversations.find((c) => c.id === id);
+  if (!saved)
+    throw new Error("That saved Kazz conversation is no longer available.");
+  state.conversations = state.conversations.filter((c) => c.id !== id);
+  archive(state);
+  const { turns, ...info } = saved;
+  state.conversation = info;
+  state.turns = turns;
+}
+function conversationInfo(info, turns) {
+  return { ...info, turnCount: turns.length };
+}
+
 // src/story.ts
 function migrate(state) {
   migrateConversations(state);
@@ -222,7 +262,7 @@ class StoryFeatures {
     if ((await this.swipes(job, before.messageId)).revision !== before.revision)
       throw new Error("The swipes changed while merging. Nothing was applied.");
     const swipes = [...before.swipes, merged], dates = [...before.dates, Math.floor(Date.now() / 1000)], active = swipes.length - 1;
-    const record = { id: crypto.randomUUID(), messageId: before.messageId, before, after: await fingerprint([swipes, dates, active]), createdAt: Date.now(), status: "prepared" };
+    const record = { id: await hostUUID(this.api), messageId: before.messageId, before, after: await fingerprint([swipes, dates, active]), createdAt: Date.now(), status: "prepared" };
     job.state.story.merges = [...job.state.story.merges.slice(-9), record];
     await job.save();
     job.live();
@@ -260,7 +300,7 @@ class StoryFeatures {
     job.live();
     if ((await this.api.chats.get(job.chatId, job.user))?.name !== before.name)
       throw new Error("The chat was renamed while Kazz was working. Your title is preserved.");
-    const record = { id: crypto.randomUUID(), before: before.name, after, status: "prepared", createdAt: Date.now() };
+    const record = { id: await hostUUID(this.api), before: before.name, after, status: "prepared", createdAt: Date.now() };
     job.state.story.names = [...job.state.story.names.slice(-9), record];
     await job.save();
     job.live();
@@ -294,7 +334,7 @@ class StoryFeatures {
     const current = (await job.messages()).find((x) => x.id === m.id);
     if (!current || await sourceHash(current) !== hash)
       throw new Error("This message or swipe changed during summarization.");
-    const entry = { id: previous?.id || crypto.randomUUID(), messageId: m.id, swipe: m.swipe_id, sourceHash: hash, summary: summaryText(result.summary), storyDate: short(result.storyDate, 80), storyTime: short(result.storyTime, 80), location: short(result.location, 120), characters: short(result.characters, 180), createdAt: previous?.createdAt || Date.now(), manual: false };
+    const entry = { id: previous?.id || await hostUUID(this.api), messageId: m.id, swipe: m.swipe_id, sourceHash: hash, summary: summaryText(result.summary), storyDate: short(result.storyDate, 80), storyTime: short(result.storyTime, 80), location: short(result.location, 120), characters: short(result.characters, 180), createdAt: previous?.createdAt || Date.now(), manual: false };
     await this.storeEntry(job, entry);
   }
   async storeEntry(job, entry) {
@@ -321,7 +361,7 @@ class StoryFeatures {
     if (!["planned", "paused", "fulfilled"].includes(String(status)))
       throw new Error("Invalid event status.");
     const afterMessages = data.afterMessages === null ? null : integer(data.afterMessages, 0, 1000);
-    const event = { id: existing?.id || crypto.randomUUID(), text: string(data.text, "Future event", 2000), afterMessages, anchor: existing?.anchor ?? messages.at(-1)?.id ?? "", status, reason: "", createdAt: existing?.createdAt || Date.now() };
+    const event = { id: existing?.id || await hostUUID(this.api), text: string(data.text, "Future event", 2000), afterMessages, anchor: existing?.anchor ?? messages.at(-1)?.id ?? "", status, reason: "", createdAt: existing?.createdAt || Date.now() };
     if (existing && existing.afterMessages !== afterMessages)
       event.anchor = messages.at(-1)?.id || "";
     job.state.story.spoilers = [...job.state.story.spoilers.filter((e) => e.id !== event.id), event];
@@ -491,6 +531,10 @@ class KazzService {
     this.bindings.clear();
   }
   async receive(payload, user, session) {
+    if (payload && typeof payload === "object" && "action" in payload && payload.action === "identity") {
+      await identityRequest(this.api, payload, user, session);
+      return;
+    }
     let req;
     try {
       const v = object(payload);
@@ -591,6 +635,7 @@ class KazzService {
     this.send(job.request, job.user, job.binding.session, { progress });
   }
   async save(job) {
+    this.live(job);
     await this.api.userStorage.setJson(this.path(job.request.chatId), job.state, { userId: job.user });
   }
   async messages(job) {
@@ -669,7 +714,7 @@ ${instruction}` }, { role: "user", content: JSON.stringify(data) }];
         return this.view(job);
       case "newConversation": {
         expectConversation(job.state, data.conversationId);
-        newConversation(job.state);
+        newConversation(job.state, await hostUUID(this.api));
         await this.save(job);
         return this.view(job);
       }
@@ -821,7 +866,7 @@ ${instruction}` }, { role: "user", content: JSON.stringify(data) }];
         else if (data.kind === "comment") {
           if (page.comments.length >= 200)
             throw new Error("This page has reached its 200-comment limit.");
-          page.comments.push({ id: crypto.randomUUID(), postId, body: string(data.text, "Comment", 2000), author: "You" });
+          page.comments.push({ id: await hostUUID(this.api), postId, body: string(data.text, "Comment", 2000), author: "You" });
         } else
           throw new Error("Unknown gallery interaction.");
         await this.save(job);
@@ -901,7 +946,7 @@ ${instruction}` }, { role: "user", content: JSON.stringify(data) }];
     this.live(job);
     if (!sameMessage((await this.messages(job)).find((x) => x.id === original.id), original.content, original.swipe_id))
       throw new Error("The message changed while Kazz was working. No edit was applied.");
-    const entry = { id: crypto.randomUUID(), label, messageId: original.id, before: original.content, after, swipe: original.swipe_id, createdAt: Date.now(), status: "prepared" };
+    const entry = { id: await hostUUID(this.api), label, messageId: original.id, before: original.content, after, swipe: original.swipe_id, createdAt: Date.now(), status: "prepared" };
     job.state.undo = [...job.state.undo.slice(-19), entry];
     await this.save(job);
     this.live(job);
@@ -948,7 +993,7 @@ ${instruction}` }, { role: "user", content: JSON.stringify(data) }];
     const current = await this.messages(job);
     if (JSON.stringify(source) !== JSON.stringify(current))
       throw new Error("The chat changed during summarization. Run it again for a consistent summary.");
-    const entry = { id: crypto.randomUUID(), text: summary, throughMessage: source.at(-1).id, messages: source.length, createdAt: Date.now() };
+    const entry = { id: await hostUUID(this.api), text: summary, throughMessage: source.at(-1).id, messages: source.length, createdAt: Date.now() };
     job.state.summaries = [...job.state.summaries.slice(-9), entry];
     await this.save(job);
     return entry;
@@ -992,10 +1037,10 @@ ${instruction}` }, { role: "user", content: JSON.stringify(data) }];
     const result = parseJSON(await this.model(job, `Write a fictional fandom page about this roleplay. Format: ${format}. Forum: an AITA-style post in a character's voice and commenters arguing. Thread: fake fandom accounts, ships, funny beef, different opinions. Wiki: fan-written article sections and disputed trivia. Stay grounded in the supplied events. Do not progress the roleplay or pretend this is a real external website. Return JSON {"title":"...","posts":[{"author":"...","title":"...","body":"..."}]}, 3\u20138 posts/sections. Body is plain text.`, { context }, 6000));
     if (!Array.isArray(result.posts) || result.posts.length < 1 || result.posts.length > 12)
       throw new Error("Invalid fandom page.");
-    const page = { id: crypto.randomUUID(), title: string(result.title, "Page title", 180), format, createdAt: Date.now(), throughMessage, votes: [], comments: [], posts: result.posts.map((raw) => {
+    const page = { id: await hostUUID(this.api), title: string(result.title, "Page title", 180), format, createdAt: Date.now(), throughMessage, votes: [], comments: [], posts: await Promise.all(result.posts.map(async (raw) => {
       const v = object(raw);
-      return { id: crypto.randomUUID(), author: string(v.author, "Author", 100), title: typeof v.title === "string" ? v.title.slice(0, 200) : "", body: string(v.body, "Post", 8000) };
-    }) };
+      return { id: await hostUUID(this.api), author: string(v.author, "Author", 100), title: typeof v.title === "string" ? v.title.slice(0, 200) : "", body: string(v.body, "Post", 8000) };
+    })) };
     this.live(job);
     job.state.pages = [...job.state.pages.slice(-29), page];
     await this.save(job);
