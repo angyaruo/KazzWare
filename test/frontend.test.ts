@@ -24,10 +24,12 @@ async function harness(plainHTTP = false) {
   const requests: { action: string; data: Record<string, unknown>; id: string; client: string; binding: string }[] = [];
   const sub = () => { subscriptions++; return () => subscriptions--; };
   let holdMessages = false; const held: unknown[] = [];
-  f.api.sendToFrontend = payload => { f.replies.push(payload); if (holdMessages && requests.find(r => r.id === payload.id)?.action === 'message') held.push(payload); else onBackend(payload); };
+  const startupReplies: unknown[] = [];
+  const deliverBackend = (payload: unknown) => { if (!ready) startupReplies.push(payload); else onBackend(payload); };
+  f.api.sendToFrontend = payload => { f.replies.push(payload); if (holdMessages && requests.find(r => r.id === payload.id)?.action === 'message') held.push(payload); else deliverBackend(payload); };
   const ctx = {
     frontendSessionId: 'ui-session',
-    deferReady() {}, ready() { ready = true; },
+    deferReady() {}, ready() { ready = true; for (const payload of startupReplies.splice(0)) onBackend(payload); },
     onBackendMessage(callback: typeof onBackend) { onBackend = callback; return sub(); },
     sendToBackend(payload: Parameters<typeof f.service.receive>[0]) { requests.push(payload as typeof requests[number]); void f.service.receive(payload, 'alice', 'ui-session'); },
     ui: {

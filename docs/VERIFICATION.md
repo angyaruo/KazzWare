@@ -1,13 +1,13 @@
-# KazzWare 0.7.6 verification · 2026-11-10
+# KazzWare 0.7.6 verification · 2026-11-11
 
 ## Confirmed locally
 
 - Windows x64; Bun 1.4.4, Node 22.15.1, TypeScript 5.9.3, Spindle SDK 0.6.79. No new runtime dependencies or permissions. The development SDK is updated and the runtime now requires Lumiverse 1.3.0+ with uuid-v1. Existing record IDs and content fingerprints are retained.
-- `npm run check`: type checking, **105 tests / 828 assertions across eleven files**, and both tracked ESM bundles passed. Backend: 67,670 bytes; frontend: 15,390,990 bytes, including original owner artwork and local font.
+- `npm run check`: type checking, **105 tests / 833 assertions across eleven files**, and both tracked ESM bundles passed. Backend: 67,670 bytes; frontend: 15,391,009 bytes, including original owner artwork and local font.
 - The exact backend scanner from Lumiverse staging `68c0fa961f0ef4cffa72ee0557aaadffa3ced2f1` accepts the rebuilt bundle without capability exemptions; its prohibited-call negative control passed.
 - `git diff --check` passed. Preview rebuilt from the shipped frontend. Runtime/source ZIPs are packaged from tracked release files after commit.
 
-New UUID regressions cover capability checks, helper errors and invalid IDs, authenticated per-document bootstrap routing, missing-session rejection, temporary-listener cleanup, startup with browser UUID/random-byte APIs absent, every persistent-record ID path, preserving existing IDs and cancellation during delayed allocation.
+New UUID regressions cover capability checks, helper errors and invalid IDs, authenticated per-document bootstrap routing, missing-session rejection, temporary-listener cleanup, listener-before-ready ordering and the host’s startup message queue, startup with browser UUID/random-byte APIs absent, every persistent-record ID path, preserving existing IDs and cancellation during delayed allocation.
 
 Retained widget regressions cover legacy style defaults, per-roleplay persistence, device overrides in both directions, resize behavior, size changes while peeking, saved positions, edge docking and existing widget reset.
 
@@ -18,7 +18,7 @@ The reported missing desktop widget was resolved on the affected installation af
 
 ## Current preview checks
 
-The shipped frontend started successfully in the local HTTP preview after its simulated, routed UUID handshake. Home and Chat opened, and switching to another sample roleplay and back remained functional. The separate integration harness explicitly disables browser randomUUID and getRandomValues during startup. Both the preview and test suite mock the UUID host interface; a live Lumiverse 1.3.0 installation has not been exercised. Source/bundle searches found no randomUUID, getRandomValues or node:crypto references in deployed code.
+The shipped frontend started successfully in the local HTTP preview after its simulated, routed UUID handshake, with replies queued until ready as in Lumiverse. Home and Chat opened, and switching to another sample roleplay and back remained functional. The separate integration harness explicitly disables browser randomUUID and getRandomValues during startup. Both the preview and test suite mock the UUID host interface; a live Lumiverse 1.3.0 installation has not been exercised. Source/bundle searches found no randomUUID, getRandomValues or node:crypto references in deployed code.
 
 ## Retained 0.7.5 preview checks
 

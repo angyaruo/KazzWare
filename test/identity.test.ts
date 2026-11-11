@@ -32,10 +32,11 @@ test('bootstrap identities use authenticated document routing and never broadcas
 });
 
 test('frontend waits for its own host-generated identity and cleans up temporary subscriptions', async () => {
-  let listener: (value: unknown) => void = () => {}, request: Record<string, unknown> = {}, subscribed = 0;
+  let listener: (value: unknown) => void = () => {}, request: Record<string, unknown> = {}, subscribed = 0, ready = false;
   const ctx = { frontendSessionId: 'document-a',
+    ready() { expect(subscribed).toBe(1); ready = true; },
     onBackendMessage(fn: typeof listener) { listener = fn; subscribed++; return () => { subscribed--; }; },
-    sendToBackend(value: unknown) { request = value as typeof request; },
+    sendToBackend(value: unknown) { expect(ready).toBe(true); request = value as typeof request; },
   } as unknown as SpindleFrontendContext;
   const result = frontendIdentity(ctx); let resolved = false; void result.then(() => { resolved = true; });
   expect(subscribed).toBe(1);

@@ -54,14 +54,16 @@ function drawStory(){story.replaceChildren(...messages.map(m=>{
 drawStory();
 function view(){for(const e of state.story.timeline){const m=messages.find(m=>m.id===e.messageId);e.stale=!m||sourceHash(m)!==e.sourceHash}return {chatName:customTitle || (chatId === 'other-chat' ? 'The last train / sample chat' : 'Blackwater / sample chat'),messages,totalMessages:messages.length,connections:[{id:'demo',name:'Sample connection',model:'Preview only'}],state:{...state,conversations:state.conversations.map(({turns,...info})=>({...info,turnCount:turns.length}))}};}
 function reply(req,result){queueMicrotask(() => backendListener({...req,ok:true,result}));}
+let frontendReady=false;const startupReplies=[];
+function deliverBackend(payload){if(frontendReady)backendListener(payload);else startupReplies.push(payload)}
 const ctx = {
   frontendSessionId:'preview-document',
-  deferReady(){},ready(){},
+  deferReady(){},ready(){frontendReady=true;for(const payload of startupReplies.splice(0))backendListener(payload)},
   state:{get(){return {chatId}},subscribe(key,fn){stateListener=fn;return ()=>{}}},
   events:{on(name,fn){const set=events.get(name)||new Set();set.add(fn);events.set(name,set);return ()=>set.delete(fn)}},
   onBackendMessage(fn){backendListener=fn;return ()=>{}},
   async sendToBackend(req){
-    if(req.action==='identity')return queueMicrotask(()=>backendListener({...req,client:'00000000-0000-4000-8000-000000000001'}));
+    if(req.action==='identity')return queueMicrotask(()=>deliverBackend({...req,client:'00000000-0000-4000-8000-000000000001'}));
     if(req.action==='cancel')chatGeneration++;
     if(['cancelCommentary','cancel','heartbeat'].includes(req.action)) return reply(req,null);
     if(req.action === 'commentary'){const key=JSON.stringify(req.data);if(!state.settings.commentaryEnabled||commentarySeen.has(key))return reply(req,null);commentarySeen.add(key);state.commentaryCount++;if(state.commentaryCount<state.settings.commentaryInterval)return reply(req,null);state.commentaryCount=0;return reply(req,"Sure. Knock back. What's the worst that could fucking happen?")}

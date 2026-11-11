@@ -46,6 +46,10 @@ export function frontendIdentity(ctx: SpindleFrontendContext): Promise<string> {
         else if (typeof reply.client === 'string' && UUID_V4.test(reply.client)) resolve(reply.client);
         else reject(new Error('Lumiverse returned an invalid KazzWare identity.'));
       });
+      // Lumiverse queues backend messages until ready(), including replies to
+      // frontend-initiated requests during async setup. Listen first, release
+      // that queue, then request the identity; awaiting before ready deadlocks.
+      ctx.ready();
       ctx.sendToBackend({ channel: CHANNEL, action: 'identity', nonce });
     }
     catch (error) { clearTimeout(timer); off(); reject(error); }

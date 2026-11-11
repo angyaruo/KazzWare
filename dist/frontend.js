@@ -58,6 +58,7 @@ function frontendIdentity(ctx) {
         else
           reject(new Error("Lumiverse returned an invalid KazzWare identity."));
       });
+      ctx.ready();
       ctx.sendToBackend({ channel: CHANNEL, action: "identity", nonce });
     } catch (error) {
       clearTimeout(timer);
